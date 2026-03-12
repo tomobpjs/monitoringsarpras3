@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitoring Sarpras RSU Dadi Keluarga</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Firebase SDK (Compat mode untuk stabilitas) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+
+        .tab-active {
+            border-bottom: 3px solid #1e40af;
+            color: #1e40af;
+            font-weight: 700;
+        }
+
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; padding: 0 !important; }
+            main { box-shadow: none !important; border: none !important; max-width: 100% !important; margin: 0 !important; }
+            .report-page { border: none !important; box-shadow: none !important; padding: 0 !important; }
+            .page-break { page-break-before: always; }
+        }
+
+        .report-table th, .report-table td {
+            border: 1px solid black;
+            padding: 8px 10px;
+            font-size: 11px;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 50;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body class="p-2 md:p-6">
+
+    <!-- Loading Screen -->
+    <div id="loader" class="loading-overlay">
+        <div class="text-blue-900 font-bold text-center p-6 bg-white rounded-2xl shadow-xl border border-blue-100">
+            <div class="w-12 h-12 border-4 border-blue-900 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p class="text-lg">Menghubungkan ke Cloud...</p>
+            <div id="error-container" class="hidden mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-left">
+                <p class="text-xs font-bold text-red-700 uppercase mb-1">Terjadi Kesalahan Koneksi:</p>
+                <p id="error-message" class="text-[10px] font-normal text-red-600 italic"></p>
+                <p class="text-[9px] text-gray-500 mt-2 font-normal leading-relaxed">
+                    <b>Solusi:</b><br>
+                    1. Buka Firebase Console > Authentication.<br>
+                    2. Aktifkan (Enable) <b>Anonymous Sign-in</b>.<br>
+                    3. Pastikan domain ini sudah terdaftar di Authorized Domains.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Update Tindak Lanjut -->
+    <div id="modal-update" class="modal no-print">
+        <div class="bg-white p-6 rounded-xl shadow-2xl w-full max-w-md mx-4">
+            <h3 class="text-lg font-bold text-blue-900 mb-4">Update Tindak Lanjut</h3>
+            <input type="hidden" id="edit-id">
+            <div class="mb-4">
+                <p class="text-[10px] font-bold text-gray-400 uppercase mb-1">Temuan</p>
+                <p id="edit-temuan-text" class="text-sm italic text-gray-700 bg-gray-50 p-2 rounded border"></p>
+            </div>
+            <div class="mb-4">
+                <label class="block text-xs font-bold mb-1 uppercase">Tindak Lanjut / Perbaikan</label>
+                <textarea id="edit-tindakan" class="w-full p-2 border rounded text-sm h-24" placeholder="Jelaskan perbaikan yang telah dilakukan..."></textarea>
+            </div>
+            <div class="mb-6">
+                <label class="block text-xs font-bold mb-1 uppercase">Status Akhir</label>
+                <select id="edit-status" class="w-full p-2 border rounded bg-white text-sm font-bold">
+                    <option value="Belum Selesai">Belum Selesai (Proses)</option>
+                    <option value="Selesai">Selesai (Tuntas)</option>
+                </select>
+            </div>
+            <div class="flex justify-end gap-2">
+                <button onclick="closeModal()" class="px-4 py-2 text-sm font-bold text-gray-500">Batal</button>
+                <button onclick="submitUpdate()" class="bg-blue-800 text-white px-6 py-2 rounded-lg font-bold text-sm">UPDATE DATA</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-white border-b-4 border-blue-900 p-6 shadow-sm mb-6 no-print flex flex-col md:flex-row justify-between items-center gap-4">
+        <div>
+            <h1 class="text-2xl font-extrabold text-blue-900 tracking-tight uppercase">RSU Dadi Keluarga</h1>
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-widest text-center md:text-left">Monitoring Sarpras Purwokerto</p>
+        </div>
+        <div class="text-center md:text-right">
+            <p class="text-sm font-bold text-blue-800">Bagian Rumah Tangga</p>
+            <p class="text-[10px] font-black text-emerald-700 uppercase tracking-tighter">● Online Cloud System</p>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+        
+        <nav class="flex border-b bg-gray-50 overflow-x-auto no-print">
+            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="px-6 py-4 tab-active whitespace-nowrap">Dashboard</button>
+            <button onclick="switchTab('input')" id="btn-input" class="px-6 py-4 whitespace-nowrap">Input Monitoring</button>
+            <button onclick="switchTab('database')" id="btn-database" class="px-6 py-4 whitespace-nowrap">Database</button>
+            <button onclick="switchTab('history')" id="btn-history" class="px-6 py-4 whitespace-nowrap">History</button>
+            <button onclick="switchTab('ringkasan')" id="btn-ringkasan" class="px-6 py-4 whitespace-nowrap text-blue-700 font-bold border-l bg-blue-50/30">Lap: Ringkasan</button>
+            <button onclick="switchTab('logtemuan')" id="btn-logtemuan" class="px-6 py-4 whitespace-nowrap text-blue-800 font-bold bg-blue-50/30">Lap: Log Detail</button>
+            <button onclick="switchTab('ruangan')" id="btn-ruangan" class="px-6 py-4 whitespace-nowrap">Master Ruangan</button>
+        </nav>
+
+        <div class="p-6">
+            <!-- DASHBOARD -->
+            <div id="view-dashboard" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-blue-600 text-white p-6 rounded-lg shadow">
+                        <h4 class="text-xs font-bold uppercase opacity-80">Total Temuan</h4>
+                        <p id="dash-total" class="text-4xl font-black mt-2">0</p>
+                    </div>
+                    <div class="bg-emerald-600 text-white p-6 rounded-lg shadow">
+                        <h4 class="text-xs font-bold uppercase opacity-80">Selesai</h4>
+                        <p id="dash-selesai" class="text-4xl font-black mt-2">0</p>
+                    </div>
+                    <div class="bg-amber-500 text-white p-6 rounded-lg shadow">
+                        <h4 class="text-xs font-bold uppercase opacity-80">Proses</h4>
+                        <p id="dash-proses" class="text-4xl font-black mt-2">0</p>
+                    </div>
+                </div>
+                <div class="bg-blue-50 border border-blue-100 p-6 rounded-xl text-center">
+                    <h3 class="font-bold text-blue-900 mb-4 uppercase text-sm">Persentase Kelayakan Sarana Prasarana</h3>
+                    <div class="w-full bg-gray-200 rounded-full h-12 overflow-hidden border-2 border-white shadow-inner relative">
+                        <div id="dash-progress" class="bg-blue-600 h-full transition-all duration-1000 flex items-center justify-center text-white font-black text-sm" style="width: 0%">0%</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INPUT FORM -->
+            <div id="view-input" class="tab-content hidden">
+                <form id="form-entry" class="max-w-3xl mx-auto bg-gray-50 p-8 rounded-xl border">
+                    <h2 class="text-xl font-bold text-blue-900 mb-6 border-b pb-2">Input Monitoring</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex flex-col">
+                            <label class="text-xs font-bold mb-1">TANGGAL CEK</label>
+                            <input type="date" id="in-tgl" class="p-2 border rounded shadow-sm" required>
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-xs font-bold mb-1">RUANGAN</label>
+                            <select id="in-room" class="p-2 border rounded shadow-sm" required></select>
+                        </div>
+                        <div class="flex flex-col md:col-span-2">
+                            <label class="text-xs font-bold mb-1">TEMUAN KERUSAKAN</label>
+                            <textarea id="in-temuan" class="p-2 border rounded h-24" placeholder="Tuliskan temuan..." required></textarea>
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-xs font-bold mb-1">RENCANA TINDAKAN</label>
+                            <input type="text" id="in-tindakan" class="p-2 border rounded" placeholder="Contoh: Perbaikan IPSRS">
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-xs font-bold mb-1">STATUS</label>
+                            <select id="in-status" class="p-2 border rounded bg-white font-bold text-blue-800">
+                                <option value="Belum Selesai">Belum Selesai (Proses)</option>
+                                <option value="Selesai">Selesai (Tuntas)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-6 flex justify-end gap-3">
+                        <button type="submit" class="bg-blue-800 text-white px-8 py-2 rounded-lg font-bold shadow-lg w-full md:w-auto">SIMPAN DATA</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- DATABASE -->
+            <div id="view-database" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="font-bold text-blue-900 uppercase">Database Cloud</h2>
+                    <button onclick="exportTableToExcel('db-table', 'Database_Monitoring')" class="bg-emerald-700 text-white px-4 py-1.5 rounded text-xs font-bold">Export Excel</button>
+                </div>
+                <div class="overflow-x-auto border rounded-lg">
+                    <table id="db-table" class="w-full text-xs text-left">
+                        <thead class="bg-blue-900 text-white uppercase">
+                            <tr>
+                                <th class="p-3 border">No</th>
+                                <th class="p-3 border">Tgl</th>
+                                <th class="p-3 border">Ruangan</th>
+                                <th class="p-3 border">Temuan</th>
+                                <th class="p-3 border">Status</th>
+                                <th class="p-3 border text-center no-print">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="db-list"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- HISTORY -->
+            <div id="view-history" class="tab-content hidden">
+                <div class="max-w-md mx-auto mb-6 no-print">
+                    <label class="text-[10px] font-bold block mb-1">FILTER RUANGAN:</label>
+                    <select id="hist-room-select" onchange="renderHistory()" class="w-full p-3 border-2 border-emerald-200 rounded-lg font-bold"></select>
+                </div>
+                <div class="overflow-x-auto border rounded-lg">
+                    <table id="hist-table" class="w-full text-xs text-left">
+                        <thead class="bg-emerald-800 text-white uppercase">
+                            <tr>
+                                <th class="p-3 border">No</th>
+                                <th class="p-3 border">Tanggal</th>
+                                <th class="p-3 border">Temuan</th>
+                                <th class="p-3 border">Tindakan</th>
+                                <th class="p-3 border">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hist-list"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- SETTINGS -->
+            <div id="view-ruangan" class="tab-content hidden">
+                <div class="max-w-md mx-auto bg-gray-50 p-6 rounded border">
+                    <h2 class="font-bold mb-4 uppercase text-blue-900 border-b">Master Ruangan</h2>
+                    <div class="flex gap-2 mb-4">
+                        <input type="text" id="new-room-name" class="flex-1 p-2 border rounded" placeholder="Nama Ruangan...">
+                        <button onclick="addRoom()" class="bg-blue-800 text-white px-4 py-2 rounded font-bold">+</button>
+                    </div>
+                    <ul id="room-list" class="space-y-2"></ul>
+                </div>
+            </div>
+
+            <!-- LAPORAN RINGKASAN -->
+            <div id="view-ringkasan" class="tab-content hidden">
+                <div class="flex gap-2 mb-4 no-print justify-center">
+                    <select id="rpt-month-sum" class="p-2 border rounded text-xs font-bold">
+                        <option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option>
+                        <option value="04">April</option><option value="05">Mei</option><option value="06">Juni</option>
+                        <option value="07">Juli</option><option value="08">Agustus</option><option value="09">September</option>
+                        <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
+                    </select>
+                    <select id="rpt-year-sum" class="p-2 border rounded text-xs font-bold"></select>
+                    <button onclick="generateReportSummary()" class="bg-blue-800 text-white px-4 py-2 rounded text-xs font-bold">LIHAT</button>
+                    <button onclick="window.print()" class="bg-gray-700 text-white px-4 py-2 rounded text-xs font-bold">CETAK</button>
+                </div>
+                <div id="report-sum-print" class="report-page bg-white p-8 border max-w-4xl mx-auto shadow-sm">
+                    <div class="text-center border-b-4 border-double border-black pb-4 mb-6">
+                        <h1 class="text-xl font-black uppercase">RSU Dadi Keluarga Purwokerto</h1>
+                        <p class="text-[9px] uppercase">Jl. Sultan Agung No. 8A, Karangklesem, Purwokerto Selatan</p>
+                    </div>
+                    <h2 class="text-center font-bold underline uppercase text-sm mb-4">LAPORAN RINGKASAN KELAYAKAN SARPRAS</h2>
+                    <p class="text-center text-[10px] font-bold mb-4">PERIODE: <span id="view-period-sum">---</span></p>
+                    <table class="w-full report-table">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th>No</th><th>Ruangan</th><th>Total Temuan</th><th>Layak</th><th>Diperbaiki</th><th>Skor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rpt-summary-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- LAPORAN LOG -->
+            <div id="view-logtemuan" class="tab-content hidden">
+                <div class="flex gap-2 mb-4 no-print justify-center">
+                    <select id="rpt-month-log" class="p-2 border rounded text-xs font-bold">
+                        <option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option>
+                        <option value="04">April</option><option value="05">Mei</option><option value="06">Juni</option>
+                        <option value="07">Juli</option><option value="08">Agustus</option><option value="09">September</option>
+                        <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
+                    </select>
+                    <select id="rpt-year-log" class="p-2 border rounded text-xs font-bold"></select>
+                    <button onclick="generateReportLog()" class="bg-blue-800 text-white px-4 py-2 rounded text-xs font-bold">LIHAT</button>
+                    <button onclick="window.print()" class="bg-gray-700 text-white px-4 py-2 rounded text-xs font-bold">CETAK</button>
+                </div>
+                <div id="report-log-print" class="report-page bg-white p-8 border max-w-4xl mx-auto shadow-sm">
+                    <div class="text-center border-b-4 border-double border-black pb-4 mb-6">
+                        <h1 class="text-xl font-black uppercase">RSU Dadi Keluarga Purwokerto</h1>
+                    </div>
+                    <h2 class="text-center font-bold underline uppercase text-sm mb-6">LOG DETAIL TEMUAN KERUSAKAN</h2>
+                    <table class="w-full report-table">
+                        <thead>
+                            <tr class="bg-gray-50">
+                                <th>No</th><th>Tgl</th><th>Unit</th><th>Temuan</th><th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rpt-detail-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // --- KONFIGURASI FIREBASE ---
+        // PENTING: Pastikan nilai-nilai ini sama persis dengan yang ada di Project Settings Firebase Console
+        const firebaseConfig = {
+  apiKey: "AIzaSyBvZG0c46fj15eR48aHQlHfVGU_ZlmpSbg",
+  authDomain: "monitoring-sarpras.firebaseapp.com",
+  projectId: "monitoring-sarpras",
+  storageBucket: "monitoring-sarpras.firebasestorage.app",
+  messagingSenderId: "929738031503",
+  appId: "1:929738031503:web:74a394f4a7fa8dc6154bfa",
+  measurementId: "G-Q8C8CC5NGM"
+};
+
+        // Inisialisasi Firebase
+        let app, db, auth;
+        try {
+            app = firebase.initializeApp(firebaseConfig);
+            db = firebase.firestore();
+            auth = firebase.auth();
+            console.log("Firebase initialized");
+        } catch (err) {
+            console.error("Firebase Init Error:", err);
+            showAuthError(err.message);
+        }
+
+        let records = [];
+        let rooms = [];
+
+        window.onload = async function() {
+            if (!auth) return;
+            
+            try {
+                // Menunggu autentikasi anonim selesai
+                console.log("Attempting anonymous sign-in...");
+                await auth.signInAnonymously();
+                console.log("Logged in anonymously");
+                
+                // Mulai sinkronisasi data setelah login sukses
+                syncData();
+                
+                // Inisialisasi input tanggal default
+                document.getElementById('in-tgl').valueAsDate = new Date();
+                populateYears();
+            } catch (error) {
+                console.error("Auth Error:", error);
+                showAuthError(error.message);
+            }
+        };
+
+        function showAuthError(msg) {
+            const container = document.getElementById('error-container');
+            const msgEl = document.getElementById('error-message');
+            msgEl.innerText = msg;
+            container.classList.remove('hidden');
+            // Matikan animasi spin loader jika error
+            document.querySelector('.animate-spin').classList.add('hidden');
+        }
+
+        function syncData() {
+            // Master Ruangan (Public Data)
+            db.collection("settings").doc("rooms").onSnapshot(doc => {
+                if (doc.exists) {
+                    rooms = doc.data().list || [];
+                } else {
+                    // Default awal jika doc belum ada
+                    rooms = ["IGD", "ICU", "POLI", "RANAP"];
+                    db.collection("settings").doc("rooms").set({list: rooms});
+                }
+                renderRoomOptions();
+            }, err => {
+                console.error("Room Sync Error:", err);
+                if (err.code === 'permission-denied') {
+                    showAuthError("Izin Firestore ditolak. Harap cek 'Firestore Rules' di Console.");
+                }
+            });
+
+            // Data Monitoring (Public Data)
+            db.collection("monitoring").orderBy("tgl", "desc").onSnapshot(snap => {
+                records = snap.docs.map(doc => ({ id_cloud: doc.id, ...doc.data() }));
+                updateDashboard();
+                renderDatabase();
+                // Hilangkan loader setelah data pertama diterima
+                document.getElementById('loader').style.display = 'none';
+            }, err => {
+                console.error("Monitoring Sync Error:", err);
+                if (err.code === 'permission-denied') {
+                    showAuthError("Izin Firestore ditolak. Pastikan Rules membolehkan baca (read).");
+                }
+            });
+        }
+
+        // --- FUNGSI NAVIGASI & FORM ---
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(v => v.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            document.getElementById(`btn-${tabId}`).classList.add('tab-active');
+        }
+
+        document.getElementById('form-entry').onsubmit = async function(e) {
+            e.preventDefault();
+            
+            if (!auth.currentUser) {
+                alert("Sesi tidak aktif. Menghubungkan ulang...");
+                location.reload();
+                return;
+            }
+
+            const data = {
+                tgl: document.getElementById('in-tgl').value,
+                ruangan: document.getElementById('in-room').value,
+                temuan: document.getElementById('in-temuan').value,
+                tindakan: document.getElementById('in-tindakan').value,
+                status: document.getElementById('in-status').value,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            try {
+                await db.collection("monitoring").add(data);
+                alert("Data berhasil tersimpan di Cloud!");
+                this.reset();
+                document.getElementById('in-tgl').valueAsDate = new Date();
+            } catch (err) {
+                console.error("Write Error:", err);
+                alert("Gagal simpan: " + err.message);
+            }
+        };
+
+        async function submitUpdate() {
+            const id = document.getElementById('edit-id').value;
+            try {
+                await db.collection("monitoring").doc(id).update({
+                    status: document.getElementById('edit-status').value,
+                    tindakan: document.getElementById('edit-tindakan').value
+                });
+                closeModal();
+            } catch (err) {
+                alert("Gagal update: " + err.message);
+            }
+        }
+
+        async function addRoom() {
+            const val = document.getElementById('new-room-name').value.trim().toUpperCase();
+            if(val && !rooms.includes(val)) {
+                const newList = [...rooms, val];
+                try {
+                    await db.collection("settings").doc("rooms").update({list: newList});
+                    document.getElementById('new-room-name').value = '';
+                } catch (err) {
+                    alert("Gagal menambah ruangan: " + err.message);
+                }
+            }
+        }
+
+        async function deleteRoom(name) {
+            if(confirm(`Hapus ruangan ${name}?`)) {
+                const newList = rooms.filter(r => r !== name);
+                try {
+                    await db.collection("settings").doc("rooms").update({list: newList});
+                } catch (err) {
+                    alert("Gagal menghapus: " + err.message);
+                }
+            }
+        }
+
+        // --- RENDER UI ---
+        function renderRoomOptions() {
+            const list = document.getElementById('room-list');
+            const inRoom = document.getElementById('in-room');
+            const histRoom = document.getElementById('hist-room-select');
+            
+            list.innerHTML = '';
+            inRoom.innerHTML = '<option value="" disabled selected>-- Pilih Ruangan --</option>';
+            histRoom.innerHTML = '<option value="" disabled selected>-- Pilih Ruangan --</option>';
+            
+            rooms.sort().forEach(r => {
+                list.innerHTML += `<li class="flex justify-between p-2 border bg-white rounded text-xs font-bold"><span>${r}</span><button onclick="deleteRoom('${r}')" class="text-red-500 hover:scale-110 transition-transform">✕</button></li>`;
+                inRoom.innerHTML += `<option value="${r}">${r}</option>`;
+                histRoom.innerHTML += `<option value="${r}">${r}</option>`;
+            });
+        }
+
+        function renderDatabase() {
+            const body = document.getElementById('db-list');
+            body.innerHTML = '';
+            records.forEach((r, idx) => {
+                body.innerHTML += `
+                    <tr class="border-b hover:bg-gray-50 uppercase">
+                        <td class="p-3 border">${idx+1}</td>
+                        <td class="p-3 border whitespace-nowrap">${r.tgl}</td>
+                        <td class="p-3 border font-bold text-blue-900">${r.ruangan}</td>
+                        <td class="p-3 border">${r.temuan}</td>
+                        <td class="p-3 border text-center">
+                            <span class="px-2 py-1 rounded text-[10px] text-white font-bold ${r.status==='Selesai'?'bg-emerald-600':'bg-amber-500'}">${r.status}</span>
+                        </td>
+                        <td class="p-3 border text-center no-print">
+                            <button onclick="openUpdateModal('${r.id_cloud}')" class="text-blue-700 font-bold hover:underline">UPDATE</button>
+                        </td>
+                    </tr>`;
+            });
+        }
+
+        function renderHistory() {
+            const room = document.getElementById('hist-room-select').value;
+            const body = document.getElementById('hist-list');
+            body.innerHTML = '';
+            records.filter(r => r.ruangan === room).forEach((r, idx) => {
+                body.innerHTML += `<tr class="border-b uppercase"><td class="p-3 border">${idx+1}</td><td class="p-3 border">${r.tgl}</td><td class="p-3 border">${r.temuan}</td><td class="p-3 border">${r.tindakan || '-'}</td><td class="p-3 border">${r.status}</td></tr>`;
+            });
+        }
+
+        function updateDashboard() {
+            const total = records.length;
+            const selesai = records.filter(r => r.status === 'Selesai').length;
+            const progress = total === 0 ? 100 : Math.round((selesai / total) * 100);
+            document.getElementById('dash-total').innerText = total;
+            document.getElementById('dash-selesai').innerText = selesai;
+            document.getElementById('dash-proses').innerText = total - selesai;
+            document.getElementById('dash-progress').style.width = progress + '%';
+            document.getElementById('dash-progress').innerText = progress + '% KELAYAKAN';
+        }
+
+        function openUpdateModal(id) {
+            const r = records.find(x => x.id_cloud === id);
+            if (!r) return;
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-temuan-text').innerText = r.temuan;
+            document.getElementById('edit-tindakan').value = r.tindakan || '';
+            document.getElementById('edit-status').value = r.status;
+            document.getElementById('modal-update').classList.add('active');
+        }
+
+        function closeModal() { document.getElementById('modal-update').classList.remove('active'); }
+
+        function populateYears() {
+            const y = new Date().getFullYear();
+            [document.getElementById('rpt-year-sum'), document.getElementById('rpt-year-log')].forEach(s => {
+                s.innerHTML = '';
+                for(let i=y; i>=y-2; i--) s.innerHTML += `<option value="${i}">${i}</option>`;
+            });
+        }
+
+        function generateReportSummary() {
+            const m = document.getElementById('rpt-month-sum').value;
+            const y = document.getElementById('rpt-year-sum').value;
+            document.getElementById('view-period-sum').innerText = `${m}/${y}`;
+            const body = document.getElementById('rpt-summary-body');
+            body.innerHTML = '';
+            
+            rooms.sort().forEach((room, idx) => {
+                const roomRecs = records.filter(r => r.ruangan === room && r.tgl.startsWith(`${y}-${m}`));
+                const temuan = roomRecs.length;
+                const tl = roomRecs.filter(r => r.status === 'Selesai').length;
+                const l = temuan - tl; 
+                const skor = temuan === 0 ? 100 : Math.round((tl/temuan)*100);
+                body.innerHTML += `<tr><td>${idx+1}</td><td>${room}</td><td>${temuan}</td><td>${l}</td><td>${tl}</td><td class="font-bold">${skor}%</td></tr>`;
+            });
+        }
+
+        function generateReportLog() {
+            const m = document.getElementById('rpt-month-log').value;
+            const y = document.getElementById('rpt-year-log').value;
+            const body = document.getElementById('rpt-detail-body');
+            body.innerHTML = '';
+            
+            records.filter(r => r.tgl.startsWith(`${y}-${m}`)).forEach((r, idx) => {
+                body.innerHTML += `<tr><td>${idx+1}</td><td>${r.tgl}</td><td>${r.ruangan}</td><td>${r.temuan}</td><td>${r.status}</td></tr>`;
+            });
+        }
+
+        function exportTableToExcel(id, name) {
+            const table = document.getElementById(id);
+            const wb = XLSX.utils.table_to_book(table);
+            XLSX.writeFile(wb, `${name}.xlsx`);
+        }
+    </script>
+</body>
+</html>
