@@ -6,672 +6,180 @@
     <title>Monitoring Sarpras RSU Dadi Keluarga</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Firebase SDKs -->
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script><!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoring Sarpras RSU Dadi Keluarga</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-        .tab-active { border-bottom: 3px solid #1e40af; color: #1e40af; font-weight: 700; background: rgba(30, 64, 175, 0.05); }
-        @media print {
-            .no-print { display: none !important; }
-            body { background: white !important; padding: 0 !important; }
-            .report-page { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
-            .report-table th, .report-table td { border: 1px solid black !important; font-size: 10px; }
-        }
-        .report-table th, .report-table td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; align-items: center; justify-content: center; backdrop-filter: blur(2px); padding: 20px; }
-        .modal.active { display: flex; }
-    </style>
-</head>
-<body class="min-h-screen">
-
-    <!-- Global Loader -->
-    <div id="loader" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
-        <div class="w-12 h-12 border-4 border-blue-900 border-t-transparent rounded-full animate-spin mb-4"></div>
-        <h2 class="text-blue-900 font-bold">Sinkronisasi Cloud...</h2>
-        <div id="auth-error-box" class="hidden mt-6 p-4 max-w-sm bg-red-50 border border-red-200 rounded-lg text-center">
-            <p class="text-red-600 text-sm font-bold" id="auth-error-msg"></p>
-            <p class="text-[10px] text-gray-500 mt-2">Pastikan domain terdaftar & Auth aktif.</p>
-        </div>
-    </div>
-
-    <!-- Edit Modal -->
-    <div id="modal-update" class="modal no-print">
-        <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all max-h-[90vh] overflow-y-auto">
-            <h3 class="text-xl font-extrabold text-blue-900 mb-6 flex items-center justify-between">
-                Edit & Update Monitoring
-                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500">✕</button>
-            </h3>
-            <input type="hidden" id="edit-id">
-            
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div>
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tanggal</label>
-                    <input type="date" id="edit-tgl" class="w-full p-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ruangan/Unit</label>
-                    <select id="edit-room" class="w-full p-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"></select>
-                </div>
-                <div class="md:col-span-2">
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Deskripsi Temuan Kerusakan</label>
-                    <textarea id="edit-temuan" class="w-full p-2 border rounded-xl text-sm h-20 outline-none focus:ring-2 focus:ring-blue-500"></textarea>
-                </div>
-                <div class="md:col-span-2 border-t pt-4">
-                    <label class="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">Tindak Lanjut / Perbaikan</label>
-                    <textarea id="edit-tindakan" class="w-full p-3 border rounded-xl text-sm h-24 bg-blue-50 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Detail perbaikan..."></textarea>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">Status Akhir</label>
-                    <select id="edit-status" class="w-full p-3 border rounded-xl bg-blue-50 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="Belum Selesai">Belum Selesai (Proses)</option>
-                        <option value="Selesai">Selesai (Tuntas)</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="flex gap-3">
-                <button onclick="closeModal()" class="flex-1 px-4 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-xl">Batal</button>
-                <button onclick="submitUpdate()" class="flex-1 bg-blue-800 text-white px-4 py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-blue-900">Simpan Perubahan</button>
-            </div>
-        </div>
-    </div>
-
-    <header class="bg-white border-b-4 border-blue-900 p-6 shadow-sm no-print">
-        <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-            <div>
-                <h1 class="text-2xl font-black text-blue-900 tracking-tight uppercase">Portal Monitoring Sarpras RSU Dadi Keluarga Purwokerto</h1>
-                <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Aplikasi Gawean Dewek v1.0 By: TOMOSJR2026</p>
-            </div>
-            <div class="flex gap-2">
-                <div class="bg-blue-50 px-4 py-2 rounded-full border border-blue-100">
-                    <p class="text-[10px] font-black text-blue-700 uppercase tracking-tighter flex items-center gap-2">
-                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Cloud Active
-                    </p>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <main class="max-w-6xl mx-auto my-6 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden min-h-[600px]">
-        <nav class="flex border-b bg-gray-50 overflow-x-auto no-print scrollbar-hide">
-            <button onclick="switchTab('dashboard')" id="btn-dashboard" class="px-6 py-4 whitespace-nowrap transition-all border-r">Dashboard</button>
-            <button onclick="switchTab('input')" id="btn-input" class="px-6 py-4 whitespace-nowrap transition-all border-r">Input Data</button>
-            <button onclick="switchTab('database')" id="btn-database" class="px-6 py-4 whitespace-nowrap transition-all border-r">Database Cloud</button>
-            <button onclick="switchTab('history')" id="btn-history" class="px-6 py-4 whitespace-nowrap transition-all border-r">Riwayat Unit</button>
-            <button onclick="switchTab('log')" id="btn-log" class="px-6 py-4 whitespace-nowrap text-blue-700 font-bold border-r bg-blue-50/20">Laporan Log Detail</button>
-            <button onclick="switchTab('ringkasan')" id="btn-ringkasan" class="px-6 py-4 whitespace-nowrap text-blue-700 font-bold border-r bg-blue-50/20">Ringkasan Skor</button>
-            <button onclick="switchTab('ruangan')" id="btn-ruangan" class="px-6 py-4 whitespace-nowrap">Master Ruangan</button>
-        </nav>
-
-        <div class="p-4 md:p-6">
-            <!-- DASHBOARD -->
-            <div id="view-dashboard" class="tab-content">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                    <div class="bg-blue-900 text-white p-6 rounded-2xl shadow-lg">
-                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Total Temuan</h4>
-                        <p id="dash-total" class="text-4xl font-black">0</p>
-                    </div>
-                    <div class="bg-emerald-600 text-white p-6 rounded-2xl shadow-lg">
-                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Selesai</h4>
-                        <p id="dash-selesai" class="text-4xl font-black">0</p>
-                    </div>
-                    <div class="bg-amber-500 text-white p-6 rounded-2xl shadow-lg">
-                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Proses</h4>
-                        <p id="dash-proses" class="text-4xl font-black">0</p>
-                    </div>
-                </div>
-                <div class="bg-white border p-8 rounded-3xl text-center">
-                    <h3 class="font-extrabold text-blue-900 mb-4 uppercase text-xs tracking-widest">Indeks Kelayakan Sarana Prasarana</h3>
-                    <div class="w-full bg-gray-100 rounded-full h-12 p-1 border relative overflow-hidden">
-                        <div id="dash-progress" class="bg-blue-700 h-full rounded-full transition-all duration-1000 flex items-center justify-center text-white font-black text-sm" style="width: 0%">0%</div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- INPUT FORM -->
-            <div id="view-input" class="tab-content hidden">
-                <form id="form-entry" class="max-w-3xl mx-auto bg-white p-6 md:p-8 rounded-2xl border shadow-sm">
-                    <h2 class="text-xl font-black text-blue-900 mb-6 uppercase tracking-widest">Input Temuan Baru</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Tanggal</label>
-                            <input type="date" id="in-tgl" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" required>
-                        </div>
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Ruangan/Unit</label>
-                            <select id="in-room" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" required></select>
-                        </div>
-                        <div class="flex flex-col md:col-span-2">
-                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Deskripsi Kerusakan</label>
-                            <textarea id="in-temuan" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 h-24" placeholder="Apa yang rusak?" required></textarea>
-                        </div>
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Rencana Tindakan</label>
-                            <input type="text" id="in-tindakan" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Perbaikan oleh IPSRS">
-                        </div>
-                        <div class="flex flex-col">
-                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Status</label>
-                            <select id="in-status" class="p-3 border rounded-xl font-bold text-blue-800">
-                                <option value="Belum Selesai">Belum Selesai (Proses)</option>
-                                <option value="Selesai">Selesai (Tuntas)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" class="mt-8 bg-blue-900 text-white w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-blue-800">Simpan Data</button>
-                </form>
-            </div>
-
-            <!-- DATABASE -->
-            <div id="view-database" class="tab-content hidden">
-                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                    <h2 class="font-black text-blue-900 uppercase tracking-widest">Database Cloud Terpusat</h2>
-                    <button onclick="exportTableToExcel('db-table', 'Data_Sarpras')" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black">EXPORT EXCEL</button>
-                </div>
-                <div class="overflow-x-auto rounded-2xl border shadow-sm">
-                    <table id="db-table" class="w-full text-[11px] text-left border-collapse">
-                        <thead class="bg-blue-900 text-white uppercase tracking-wider">
-                            <tr>
-                                <th class="p-4">No</th>
-                                <th class="p-4">Tanggal</th>
-                                <th class="p-4">Unit</th>
-                                <th class="p-4">Temuan</th>
-                                <th class="p-4">Status</th>
-                                <th class="p-4 text-center no-print">Aksi Navigasi</th>
-                            </tr>
-                        </thead>
-                        <tbody id="db-list"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- RIWAYAT -->
-            <div id="view-history" class="tab-content hidden">
-                <div class="max-w-md mx-auto mb-6">
-                    <label class="text-[10px] font-black text-gray-400 mb-1 block text-center uppercase">Filter Berdasarkan Unit:</label>
-                    <select id="hist-room-select" onchange="renderHistory()" class="w-full p-4 border rounded-2xl font-bold text-blue-900 bg-white shadow-sm"></select>
-                </div>
-                <div class="overflow-x-auto rounded-2xl border shadow-sm">
-                    <table class="w-full text-xs text-left">
-                        <thead class="bg-gray-100 uppercase">
-                            <tr>
-                                <th class="p-4">Tanggal</th>
-                                <th class="p-4">Temuan</th>
-                                <th class="p-4">Tindakan</th>
-                                <th class="p-4">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="hist-list"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- LAPORAN LOG DETAIL -->
-            <div id="view-log" class="tab-content hidden">
-                <div class="flex flex-wrap gap-2 mb-6 no-print justify-center bg-gray-50 p-4 rounded-xl">
-                    <select id="rpt-month" class="p-2 border rounded-xl text-xs font-bold">
-                        <option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option>
-                        <option value="04">April</option><option value="05">Mei</option><option value="06">Juni</option>
-                        <option value="07">Juli</option><option value="08">Agustus</option><option value="09">September</option>
-                        <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
-                    </select>
-                    <select id="rpt-year" class="p-2 border rounded-xl text-xs font-bold"></select>
-                    <button onclick="generateReport()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black">LIHAT</button>
-                    <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-xl text-[10px] font-black">CETAK PDF</button>
-                </div>
-                <div id="report-print" class="report-page bg-white p-10 border max-w-4xl mx-auto shadow-sm">
-                    <div class="text-center border-b-4 border-double border-black pb-4 mb-8">
-                        <h1 class="text-xl font-black uppercase">RSU Dadi Keluarga Purwokerto</h1>
-                        <p class="text-[9px] font-bold">Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan</p>
-                    </div>
-                    <h2 class="text-center font-bold underline uppercase text-sm mb-6">LAPORAN MONITORING SARANA PRASARANA</h2>
-                    <table class="w-full report-table">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th style="width: 5%">No</th>
-                                <th style="width: 15%">Tgl</th>
-                                <th style="width: 15%">Unit</th>
-                                <th style="width: 30%">Temuan Kerusakan</th>
-                                <th style="width: 25%">Tindak Lanjut</th>
-                                <th style="width: 10%">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="rpt-body"></tbody>
-                    </table>
-                    <div class="mt-12 flex justify-end">
-                        <div class="text-center">
-                            <p class="text-[10px] mb-12">Purwokerto, <span id="rpt-date-now"></span></p>
-                            <p class="text-[10px] font-bold underline">Petugas Rumah Tangga</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- RINGKASAN SKOR -->
-            <div id="view-ringkasan" class="tab-content hidden">
-                <div class="flex flex-wrap gap-2 mb-6 no-print justify-center bg-gray-50 p-4 rounded-xl">
-                    <select id="rpt-month-sum" class="p-2 border rounded-xl text-xs font-bold">
-                        <option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option>
-                        <option value="04">April</option><option value="05">Mei</option><option value="06">Juni</option>
-                        <option value="07">Juli</option><option value="08">Agustus</option><option value="09">September</option>
-                        <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
-                    </select>
-                    <select id="rpt-year-sum" class="p-2 border rounded-xl text-xs font-bold"></select>
-                    <button onclick="generateReportSummary()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black">LIHAT</button>
-                </div>
-                <div id="report-sum-print" class="report-page bg-white p-10 border max-w-4xl mx-auto">
-                    <div class="text-center border-b-4 border-double border-black pb-4 mb-8">
-                        <h1 class="text-xl font-black uppercase">RSU Dadi Keluarga</h1>
-                        <p class="text-[9px] font-bold">Ringkasan Kelayakan Sarpras Per Unit</p>
-                    </div>
-                    <table class="w-full report-table">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th>No</th><th>Unit</th><th>Total Temuan</th><th>Selesai</th><th>Proses</th><th>Skor Kelayakan</th>
-                            </tr>
-                        </thead>
-                        <tbody id="rpt-summary-body"></tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- MASTER RUANGAN -->
-            <div id="view-ruangan" class="tab-content hidden">
-                <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border">
-                    <h2 class="font-black mb-6 uppercase text-blue-900 border-b pb-2 tracking-widest">Manajemen Unit</h2>
-                    <div class="flex gap-2 mb-6">
-                        <input type="text" id="new-room-name" class="flex-1 p-3 border rounded-xl outline-none" placeholder="Nama Unit Baru...">
-                        <button onclick="addRoom()" class="bg-blue-900 text-white px-6 py-3 rounded-xl font-black">+</button>
-                    </div>
-                    <ul id="room-list" class="space-y-2"></ul>
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <script>
-        // --- FIREBASE CONFIG ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBvZG0c46fj15eR48aHQlHfVGU_ZlmpSbg",
-            authDomain: "monitoring-sarpras.firebaseapp.com",
-            projectId: "monitoring-sarpras",
-            storageBucket: "monitoring-sarpras.firebasestorage.app",
-            messagingSenderId: "929738031503",
-            appId: "1:929738031503:web:74a394f4a7fa8dc6154bfa",
-            measurementId: "G-Q8C8CC5NGM"
-        };
-
-        const app = firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-        const auth = firebase.auth();
-
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'monitoring-sarpras';
-        const MONITORING_COL = db.collection('artifacts', APP_ID, 'public', 'data', 'monitoring');
-        const SETTINGS_DOC = db.doc(`artifacts/${APP_ID}/settings/rooms_config`);
-
-        let records = [];
-        let rooms = [];
-
-        window.onload = async () => {
-            try {
-                await auth.signInAnonymously();
-                
-                // Sync Rooms
-                SETTINGS_DOC.onSnapshot(doc => {
-                    if (doc.exists) {
-                        rooms = doc.data().list || [];
-                    } else {
-                        rooms = ["IGD", "POLI", "ICU", "RANAP"];
-                        SETTINGS_DOC.set({ list: rooms });
-                    }
-                    renderRoomOptions();
-                }, err => console.error("Room Sync Error:", err));
-
-                // Sync Data
-                MONITORING_COL.orderBy('tgl', 'desc').onSnapshot(snap => {
-                    records = snap.docs.map(doc => ({ id_cloud: doc.id, ...doc.data() }));
-                    updateDashboard();
-                    renderDatabase();
-                    document.getElementById('loader').style.display = 'none';
-                }, err => console.error("Data Sync Error:", err));
-
-                document.getElementById('in-tgl').valueAsDate = new Date();
-                populateYears();
-                switchTab('dashboard');
-                document.getElementById('rpt-date-now').innerText = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
-
-            } catch (err) {
-                console.error(err);
-                document.getElementById('auth-error-box').classList.remove('hidden');
-                document.getElementById('auth-error-msg').innerText = "Koneksi Gagal: " + err.message;
-            }
-        };
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(v => v.classList.add('hidden'));
-            document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
-            document.getElementById(`btn-${tabId}`).classList.add('tab-active');
-        }
-
-        // --- DATABASE OPERATIONS ---
-        document.getElementById('form-entry').onsubmit = async function(e) {
-            e.preventDefault();
-            const data = {
-                tgl: document.getElementById('in-tgl').value,
-                ruangan: document.getElementById('in-room').value,
-                temuan: document.getElementById('in-temuan').value,
-                tindakan: document.getElementById('in-tindakan').value,
-                status: document.getElementById('in-status').value,
-                timestamp: firebase.firestore.FieldValue.serverTimestamp()
-            };
-
-            try {
-                await MONITORING_COL.add(data);
-                this.reset();
-                document.getElementById('in-tgl').valueAsDate = new Date();
-                alert("Data Tersimpan!");
-            } catch (err) {
-                alert("Gagal: " + err.message);
-            }
-        };
-
-        async function submitUpdate() {
-            const id = document.getElementById('edit-id').value;
-            const updateData = {
-                tgl: document.getElementById('edit-tgl').value,
-                ruangan: document.getElementById('edit-room').value,
-                temuan: document.getElementById('edit-temuan').value,
-                tindakan: document.getElementById('edit-tindakan').value,
-                status: document.getElementById('edit-status').value
-            };
-
-            try {
-                await MONITORING_COL.doc(id).update(updateData);
-                closeModal();
-            } catch (err) {
-                alert("Gagal update data.");
-            }
-        }
-
-        async function deleteData(id) {
-            if (confirm("Hapus data ini?")) {
-                try {
-                    await MONITORING_COL.doc(id).delete();
-                } catch (err) {
-                    alert("Gagal menghapus data.");
-                }
-            }
-        }
-
-        // --- MASTER RUANGAN ---
-        async function addRoom() {
-            const val = document.getElementById('new-room-name').value.trim().toUpperCase();
-            if (!val) return;
-            if (!rooms.includes(val)) {
-                const newList = [...rooms, val];
-                await SETTINGS_DOC.set({ list: newList });
-                document.getElementById('new-room-name').value = '';
-            }
-        }
-
-        async function deleteRoom(name) {
-            if (!confirm(`Hapus unit ${name}?`)) return;
-            const newList = rooms.filter(r => r !== name);
-            await SETTINGS_DOC.set({ list: newList });
-        }
-
-        // --- RENDERERS ---
-        function renderRoomOptions() {
-            const selects = ['in-room', 'edit-room', 'hist-room-select'];
-            const sortedRooms = [...rooms].sort();
-            const options = sortedRooms.map(r => `<option value="${r}">${r}</option>`).join('');
-            
-            selects.forEach(id => {
-                const el = document.getElementById(id);
-                if (id === 'in-room' || id === 'hist-room-select') {
-                    el.innerHTML = '<option value="" disabled selected>-- Pilih Unit --</option>' + options;
-                } else {
-                    el.innerHTML = options;
-                }
-            });
-
-            document.getElementById('room-list').innerHTML = sortedRooms.map(r => `
-                <li class="flex justify-between items-center p-3 border rounded-xl text-xs font-bold uppercase">
-                    ${r}
-                    <button onclick="deleteRoom('${r}')" class="text-red-500 font-black">✕</button>
-                </li>
-            `).join('');
-        }
-
-        function renderDatabase() {
-            const body = document.getElementById('db-list');
-            body.innerHTML = records.map((r, idx) => `
-                <tr class="border-b hover:bg-gray-50 uppercase font-medium">
-                    <td class="p-4 font-bold text-gray-400">${idx + 1}</td>
-                    <td class="p-4 whitespace-nowrap">${r.tgl}</td>
-                    <td class="p-4 font-extrabold text-blue-900">${r.ruangan}</td>
-                    <td class="p-4">${r.temuan}</td>
-                    <td class="p-4">
-                        <span class="px-2 py-1 rounded-full text-[9px] font-black ${r.status === 'Selesai' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
-                            ${r.status}
-                        </span>
-                    </td>
-                    <td class="p-4 text-center no-print">
-                        <div class="flex gap-2 justify-center">
-                            <button onclick="openUpdateModal('${r.id_cloud}')" class="bg-blue-900 text-white px-3 py-1.5 rounded-lg font-black text-[9px]">EDIT</button>
-                            <button onclick="deleteData('${r.id_cloud}')" class="bg-red-500 text-white px-3 py-1.5 rounded-lg font-black text-[9px]">HAPUS</button>
-                        </div>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        function renderHistory() {
-            const room = document.getElementById('hist-room-select').value;
-            const body = document.getElementById('hist-list');
-            body.innerHTML = records.filter(r => r.ruangan === room).map(r => `
-                <tr class="border-b uppercase">
-                    <td class="p-4 whitespace-nowrap">${r.tgl}</td>
-                    <td class="p-4 font-bold">${r.temuan}</td>
-                    <td class="p-4 italic">${r.tindakan || '-'}</td>
-                    <td class="p-4 font-black ${r.status === 'Selesai' ? 'text-emerald-600' : 'text-amber-500'}">${r.status}</td>
-                </tr>
-            `).join('');
-        }
-
-        function updateDashboard() {
-            const total = records.length;
-            const selesai = records.filter(r => r.status === 'Selesai').length;
-            const progress = total === 0 ? 100 : Math.round((selesai / total) * 100);
-            document.getElementById('dash-total').innerText = total;
-            document.getElementById('dash-selesai').innerText = selesai;
-            document.getElementById('dash-proses').innerText = total - selesai;
-            document.getElementById('dash-progress').style.width = progress + '%';
-            document.getElementById('dash-progress').innerText = progress + '% KELAYAKAN';
-        }
-
-        function generateReport() {
-            const m = document.getElementById('rpt-month').value;
-            const y = document.getElementById('rpt-year').value;
-            const filtered = records.filter(r => r.tgl.startsWith(`${y}-${m}`));
-            const body = document.getElementById('rpt-body');
-            body.innerHTML = filtered.length ? filtered.map((r, idx) => `
-                <tr>
-                    <td>${idx + 1}</td>
-                    <td>${r.tgl}</td>
-                    <td class="font-bold">${r.ruangan}</td>
-                    <td>${r.temuan}</td>
-                    <td>${r.tindakan || '-'}</td>
-                    <td class="font-black text-[8px]">${r.status}</td>
-                </tr>
-            `).join('') : '<tr><td colspan="6" class="text-center italic py-4">Tidak ada data untuk periode ini</td></tr>';
-        }
-
-        function generateReportSummary() {
-            const m = document.getElementById('rpt-month-sum').value;
-            const y = document.getElementById('rpt-year-sum').value;
-            const body = document.getElementById('rpt-summary-body');
-            body.innerHTML = rooms.sort().map((room, idx) => {
-                const roomRecs = records.filter(r => r.ruangan === room && r.tgl.startsWith(`${y}-${m}`));
-                const total = roomRecs.length;
-                const done = roomRecs.filter(r => r.status === 'Selesai').length;
-                const proc = total - done;
-                const score = total === 0 ? 100 : Math.round((done/total)*100);
-                return `<tr><td>${idx+1}</td><td>${room}</td><td>${total}</td><td>${done}</td><td>${proc}</td><td class="font-black">${score}%</td></tr>`;
-            }).join('');
-        }
-
-        function populateYears() {
-            const y = new Date().getFullYear();
-            const selects = ['rpt-year', 'rpt-year-sum'];
-            selects.forEach(id => {
-                const s = document.getElementById(id);
-                s.innerHTML = '';
-                for(let i=y; i>=y-2; i--) s.innerHTML += `<option value="${i}">${i}</option>`;
-            });
-        }
-
-        function openUpdateModal(id) {
-            const r = records.find(x => x.id_cloud === id);
-            if (!r) return;
-            document.getElementById('edit-id').value = id;
-            document.getElementById('edit-tgl').value = r.tgl;
-            document.getElementById('edit-room').value = r.r
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
         .tab-active { border-bottom: 3px solid #1e40af; color: #1e40af; font-weight: 700; background: rgba(30, 64, 175, 0.05); }
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; align-items: center; justify-content: center; backdrop-filter: blur(2px); }
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; padding: 0 !important; }
+            .report-page { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
+            .report-table th, .report-table td { border: 1px solid black !important; font-size: 10px; }
+        }
+        .report-table th, .report-table td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; align-items: center; justify-content: center; backdrop-filter: blur(2px); padding: 20px; }
         .modal.active { display: flex; }
-        #loader { transition: opacity 0.5s ease; }
     </style>
 </head>
 <body class="min-h-screen">
 
-    <!-- Screen Loader dengan Diagnostik -->
-    <div id="loader" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center p-6 text-center">
-        <div id="spinner" class="w-14 h-14 border-4 border-blue-900 border-t-transparent rounded-full animate-spin mb-6"></div>
-        <h2 id="status-text" class="text-blue-900 font-bold text-lg mb-2">Memulai Koneksi Cloud...</h2>
-        <p id="debug-text" class="text-xs text-gray-400 font-mono mb-8">System Initializing...</p>
-        
-        <div id="repair-box" class="hidden max-w-sm bg-amber-50 border border-amber-200 p-6 rounded-2xl shadow-sm">
-            <p class="text-amber-700 text-sm font-bold mb-4">Koneksi Terlalu Lama</p>
-            <p class="text-xs text-amber-600 mb-6 leading-relaxed">Pastikan Firebase Security Rules diatur ke <br><code class="bg-amber-100 px-1">allow read, write: if true;</code><br>untuk pengujian.</p>
-            <div class="flex flex-col gap-2">
-                <button onclick="window.location.reload()" class="bg-blue-900 text-white py-3 rounded-xl text-xs font-bold">Coba Lagi</button>
-                <button onclick="forceOpen()" class="text-blue-900 text-[10px] font-bold underline">Buka Mode Offline (Hanya Lihat)</button>
+    <!-- Global Loader -->
+    <div id="loader" class="fixed inset-0 bg-white z-[100] flex flex-col items-center justify-center">
+        <div class="w-12 h-12 border-4 border-blue-900 border-t-transparent rounded-full animate-spin mb-4"></div>
+        <h2 class="text-blue-900 font-bold">Sinkronisasi Cloud...</h2>
+        <div id="auth-error-box" class="hidden mt-6 p-4 max-w-sm bg-red-50 border border-red-200 rounded-lg text-center">
+            <p class="text-red-600 text-sm font-bold" id="auth-error-msg"></p>
+            <p class="text-[10px] text-gray-500 mt-2">Pastikan domain terdaftar & Auth aktif.</p>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="modal-update" class="modal no-print">
+        <div class="bg-white p-6 rounded-2xl shadow-2xl w-full max-w-2xl transform transition-all max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-extrabold text-blue-900 mb-6 flex items-center justify-between">
+                Edit & Update Monitoring
+                <button onclick="closeModal()" class="text-gray-400 hover:text-red-500">✕</button>
+            </h3>
+            <input type="hidden" id="edit-id">
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Tanggal</label>
+                    <input type="date" id="edit-tgl" class="w-full p-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ruangan/Unit</label>
+                    <select id="edit-room" class="w-full p-2 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500"></select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Deskripsi Temuan Kerusakan</label>
+                    <textarea id="edit-temuan" class="w-full p-2 border rounded-xl text-sm h-20 outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div class="md:col-span-2 border-t pt-4">
+                    <label class="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">Tindak Lanjut / Perbaikan</label>
+                    <textarea id="edit-tindakan" class="w-full p-3 border rounded-xl text-sm h-24 bg-blue-50 outline-none focus:ring-2 focus:ring-blue-500" placeholder="Detail perbaikan..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">Status Akhir</label>
+                    <select id="edit-status" class="w-full p-3 border rounded-xl bg-blue-50 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="Belum Selesai">Belum Selesai (Proses)</option>
+                        <option value="Selesai">Selesai (Tuntas)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="flex gap-3">
+                <button onclick="closeModal()" class="flex-1 px-4 py-3 text-sm font-bold text-gray-500 hover:bg-gray-100 rounded-xl">Batal</button>
+                <button onclick="submitUpdate()" class="flex-1 bg-blue-800 text-white px-4 py-3 rounded-xl font-bold text-sm shadow-lg hover:bg-blue-900">Simpan Perubahan</button>
             </div>
         </div>
     </div>
 
-    <!-- Layout Utama -->
     <header class="bg-white border-b-4 border-blue-900 p-6 shadow-sm no-print">
         <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
-                <h1 class="text-2xl font-black text-blue-900 tracking-tight uppercase">Monitoring Sarpras RSU Dadi Keluarga</h1>
-                <p class="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Database Monitoring Terintegrasi</p>
+                <h1 class="text-2xl font-black text-blue-900 tracking-tight uppercase">Portal Monitoring Sarpras RSU Dadi Keluarga Purwokerto</h1>
+                <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Aplikasi Gawean Dewek v1.0 By: TOMOSJR2026</p>
             </div>
-            <div id="cloud-indicator" class="hidden flex items-center gap-2 bg-green-50 px-4 py-1.5 rounded-full border border-green-200">
-                <span class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                <span class="text-[10px] font-black text-green-700 uppercase">Live Database Terhubung</span>
+            <div class="flex gap-2">
+                <div class="bg-blue-50 px-4 py-2 rounded-full border border-blue-100">
+                    <p class="text-[10px] font-black text-blue-700 uppercase tracking-tighter flex items-center gap-2">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Cloud Active
+                    </p>
+                </div>
             </div>
         </div>
     </header>
 
     <main class="max-w-6xl mx-auto my-6 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden min-h-[600px]">
-        <nav class="flex border-b bg-gray-50 overflow-x-auto no-print">
+        <nav class="flex border-b bg-gray-50 overflow-x-auto no-print scrollbar-hide">
             <button onclick="switchTab('dashboard')" id="btn-dashboard" class="px-6 py-4 whitespace-nowrap transition-all border-r">Dashboard</button>
             <button onclick="switchTab('input')" id="btn-input" class="px-6 py-4 whitespace-nowrap transition-all border-r">Input Data</button>
-            <button onclick="switchTab('database')" id="btn-database" class="px-6 py-4 whitespace-nowrap transition-all border-r">Database</button>
+            <button onclick="switchTab('database')" id="btn-database" class="px-6 py-4 whitespace-nowrap transition-all border-r">Database Cloud</button>
             <button onclick="switchTab('history')" id="btn-history" class="px-6 py-4 whitespace-nowrap transition-all border-r">Riwayat Unit</button>
-            <button onclick="switchTab('log')" id="btn-log" class="px-6 py-4 whitespace-nowrap border-r font-bold text-blue-800">Log Detail</button>
-            <button onclick="switchTab('ringkasan')" id="btn-ringkasan" class="px-6 py-4 whitespace-nowrap border-r font-bold text-blue-800">Skor Skor</button>
-            <button onclick="switchTab('ruangan')" id="btn-ruangan" class="px-6 py-4 whitespace-nowrap font-bold text-emerald-700">Master Ruangan</button>
+            <button onclick="switchTab('log')" id="btn-log" class="px-6 py-4 whitespace-nowrap text-blue-700 font-bold border-r bg-blue-50/20">Laporan Log Detail</button>
+            <button onclick="switchTab('ringkasan')" id="btn-ringkasan" class="px-6 py-4 whitespace-nowrap text-blue-700 font-bold border-r bg-blue-50/20">Ringkasan Skor</button>
+            <button onclick="switchTab('ruangan')" id="btn-ruangan" class="px-6 py-4 whitespace-nowrap">Master Ruangan</button>
         </nav>
 
-        <div class="p-6">
+        <div class="p-4 md:p-6">
             <!-- DASHBOARD -->
             <div id="view-dashboard" class="tab-content">
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div class="bg-blue-900 text-white p-8 rounded-2xl shadow-lg transform transition hover:scale-[1.02]">
-                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2">Total Temuan</h4>
-                        <p id="dash-total" class="text-5xl font-black">0</p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div class="bg-blue-900 text-white p-6 rounded-2xl shadow-lg">
+                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Total Temuan</h4>
+                        <p id="dash-total" class="text-4xl font-black">0</p>
                     </div>
-                    <div class="bg-emerald-600 text-white p-8 rounded-2xl shadow-lg transform transition hover:scale-[1.02]">
-                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2">Tuntas</h4>
-                        <p id="dash-selesai" class="text-5xl font-black">0</p>
+                    <div class="bg-emerald-600 text-white p-6 rounded-2xl shadow-lg">
+                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Selesai</h4>
+                        <p id="dash-selesai" class="text-4xl font-black">0</p>
                     </div>
-                    <div class="bg-amber-500 text-white p-8 rounded-2xl shadow-lg transform transition hover:scale-[1.02]">
-                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-60 mb-2">Proses</h4>
-                        <p id="dash-proses" class="text-5xl font-black">0</p>
+                    <div class="bg-amber-500 text-white p-6 rounded-2xl shadow-lg">
+                        <h4 class="text-[10px] font-bold uppercase tracking-widest opacity-70 mb-1">Proses</h4>
+                        <p id="dash-proses" class="text-4xl font-black">0</p>
                     </div>
                 </div>
-                <div class="bg-gray-50 p-10 rounded-3xl text-center border">
-                    <h3 class="font-extrabold text-blue-900 mb-6 uppercase text-sm tracking-widest">Indeks Kelayakan Bangunan & Alat</h3>
-                    <div class="w-full bg-white rounded-full h-16 p-2 shadow-inner border relative">
-                        <div id="dash-progress" class="bg-blue-700 h-full rounded-full transition-all duration-1000 flex items-center justify-center text-white font-black text-sm shadow-md" style="width: 0%">0%</div>
+                <div class="bg-white border p-8 rounded-3xl text-center">
+                    <h3 class="font-extrabold text-blue-900 mb-4 uppercase text-xs tracking-widest">Indeks Kelayakan Sarana Prasarana</h3>
+                    <div class="w-full bg-gray-100 rounded-full h-12 p-1 border relative overflow-hidden">
+                        <div id="dash-progress" class="bg-blue-700 h-full rounded-full transition-all duration-1000 flex items-center justify-center text-white font-black text-sm" style="width: 0%">0%</div>
                     </div>
                 </div>
             </div>
 
-            <!-- TAB LAINNYA (Sama seperti sebelumnya namun tetap dipertahankan strukturnya) -->
+            <!-- INPUT FORM -->
             <div id="view-input" class="tab-content hidden">
-                <form id="form-entry" class="max-w-3xl mx-auto bg-white p-8 rounded-3xl border shadow-sm">
-                    <h2 class="text-2xl font-black text-blue-900 mb-8 uppercase tracking-tight">Tambah Temuan Baru</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <form id="form-entry" class="max-w-3xl mx-auto bg-white p-6 md:p-8 rounded-2xl border shadow-sm">
+                    <h2 class="text-xl font-black text-blue-900 mb-6 uppercase tracking-widest">Input Temuan Baru</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="flex flex-col">
-                            <label class="text-[10px] font-black text-gray-400 mb-2 uppercase">Tanggal Temuan</label>
-                            <input type="date" id="in-tgl" class="p-4 border rounded-2xl bg-gray-50" required>
+                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Tanggal</label>
+                            <input type="date" id="in-tgl" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" required>
                         </div>
                         <div class="flex flex-col">
-                            <label class="text-[10px] font-black text-gray-400 mb-2 uppercase">Lokasi/Unit</label>
-                            <select id="in-room" class="p-4 border rounded-2xl bg-gray-50" required></select>
+                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Ruangan/Unit</label>
+                            <select id="in-room" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" required></select>
                         </div>
                         <div class="flex flex-col md:col-span-2">
-                            <label class="text-[10px] font-black text-gray-400 mb-2 uppercase">Rincian Temuan Kerusakan</label>
-                            <textarea id="in-temuan" class="p-4 border rounded-2xl bg-gray-50 h-32" placeholder="Jelaskan detail kerusakan yang ditemukan..." required></textarea>
+                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Deskripsi Kerusakan</label>
+                            <textarea id="in-temuan" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 h-24" placeholder="Apa yang rusak?" required></textarea>
                         </div>
                         <div class="flex flex-col">
-                            <label class="text-[10px] font-black text-gray-400 mb-2 uppercase">Status Awal</label>
-                            <select id="in-status" class="p-4 border rounded-2xl bg-gray-50 font-bold">
+                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Rencana Tindakan</label>
+                            <input type="text" id="in-tindakan" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="Contoh: Perbaikan oleh IPSRS">
+                        </div>
+                        <div class="flex flex-col">
+                            <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Status</label>
+                            <select id="in-status" class="p-3 border rounded-xl font-bold text-blue-800">
                                 <option value="Belum Selesai">Belum Selesai (Proses)</option>
                                 <option value="Selesai">Selesai (Tuntas)</option>
                             </select>
                         </div>
                     </div>
-                    <button type="submit" class="mt-10 bg-blue-900 text-white w-full py-5 rounded-2xl font-black uppercase shadow-xl hover:bg-blue-800 transition-all">Simpan ke Cloud</button>
+                    <button type="submit" class="mt-8 bg-blue-900 text-white w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-blue-800">Simpan Data</button>
                 </form>
             </div>
 
-            <!-- View DATABASE -->
+            <!-- DATABASE -->
             <div id="view-database" class="tab-content hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="font-black text-blue-900 uppercase">Seluruh Data Temuan</h2>
-                    <button onclick="exportTableToExcel('db-table', 'Data_Sarpras')" class="bg-emerald-600 text-white px-6 py-2 rounded-xl text-[10px] font-black uppercase">Export Excel</button>
+                <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+                    <h2 class="font-black text-blue-900 uppercase tracking-widest">Database Cloud Terpusat</h2>
+                    <button onclick="exportTableToExcel('db-table', 'Data_Sarpras')" class="bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black">EXPORT EXCEL</button>
                 </div>
-                <div class="overflow-x-auto rounded-2xl border">
-                    <table id="db-table" class="w-full text-[11px] text-left">
-                        <thead class="bg-blue-900 text-white uppercase">
+                <div class="overflow-x-auto rounded-2xl border shadow-sm">
+                    <table id="db-table" class="w-full text-[11px] text-left border-collapse">
+                        <thead class="bg-blue-900 text-white uppercase tracking-wider">
                             <tr>
-                                <th class="p-5">No</th>
-                                <th class="p-5">Tanggal</th>
-                                <th class="p-5">Unit</th>
-                                <th class="p-5">Temuan</th>
-                                <th class="p-5">Status</th>
-                                <th class="p-5 text-center no-print">Aksi</th>
+                                <th class="p-4">No</th>
+                                <th class="p-4">Tanggal</th>
+                                <th class="p-4">Unit</th>
+                                <th class="p-4">Temuan</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-center no-print">Aksi Navigasi</th>
                             </tr>
                         </thead>
                         <tbody id="db-list"></tbody>
@@ -679,30 +187,29 @@
                 </div>
             </div>
 
-            <!-- View HISTORY -->
+            <!-- RIWAYAT -->
             <div id="view-history" class="tab-content hidden">
-                <div class="max-w-md mx-auto mb-10 text-center">
-                    <label class="text-[10px] font-black text-gray-400 mb-3 block uppercase tracking-widest">Pilih Unit Kerja</label>
-                    <select id="hist-room-select" onchange="renderHistory()" class="w-full p-5 border rounded-3xl font-black text-blue-900 bg-white shadow-xl text-center uppercase tracking-widest appearance-none"></select>
+                <div class="max-w-md mx-auto mb-6">
+                    <label class="text-[10px] font-black text-gray-400 mb-1 block text-center uppercase">Filter Berdasarkan Unit:</label>
+                    <select id="hist-room-select" onchange="renderHistory()" class="w-full p-4 border rounded-2xl font-bold text-blue-900 bg-white shadow-sm"></select>
                 </div>
-                <div id="hist-container" class="grid gap-4"></div>
+                <div class="overflow-x-auto rounded-2xl border shadow-sm">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-gray-100 uppercase">
+                            <tr>
+                                <th class="p-4">Tanggal</th>
+                                <th class="p-4">Temuan</th>
+                                <th class="p-4">Tindakan</th>
+                                <th class="p-4">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="hist-list"></tbody>
+                    </table>
+                </div>
             </div>
 
-            <!-- MASTER RUANGAN -->
-            <div id="view-ruangan" class="tab-content hidden">
-                <div class="max-w-md mx-auto bg-gray-50 p-8 rounded-3xl border">
-                    <h2 class="font-black text-xl mb-8 uppercase text-blue-900 border-b pb-4">Master Unit</h2>
-                    <div class="flex gap-3 mb-8">
-                        <input type="text" id="new-room-name" class="flex-1 p-4 border rounded-2xl shadow-inner outline-none" placeholder="NAMA UNIT...">
-                        <button onclick="addRoom()" class="bg-blue-900 text-white px-6 rounded-2xl font-black">+</button>
-                    </div>
-                    <ul id="room-list" class="space-y-3"></ul>
-                </div>
-            </div>
-            
-            <!-- Tambahan tab log dan ringkasan di kode asli tetap ada -->
+            <!-- LAPORAN LOG DETAIL -->
             <div id="view-log" class="tab-content hidden">
-                <!-- Log Detail Content -->
                 <div class="flex flex-wrap gap-2 mb-6 no-print justify-center bg-gray-50 p-4 rounded-xl">
                     <select id="rpt-month" class="p-2 border rounded-xl text-xs font-bold">
                         <option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option>
@@ -711,19 +218,39 @@
                         <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
                     </select>
                     <select id="rpt-year" class="p-2 border rounded-xl text-xs font-bold"></select>
-                    <button onclick="generateReport()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Filter</button>
-                    <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Cetak</button>
+                    <button onclick="generateReport()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black">LIHAT</button>
+                    <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-xl text-[10px] font-black">CETAK PDF</button>
                 </div>
-                <div class="report-page bg-white p-6 border overflow-x-auto">
-                    <table class="w-full text-[10px] border-collapse">
-                        <thead><tr class="bg-gray-100"><th class="border p-2">No</th><th class="border p-2">Tgl</th><th class="border p-2">Unit</th><th class="border p-2">Temuan</th><th class="border p-2">Status</th></tr></thead>
+                <div id="report-print" class="report-page bg-white p-10 border max-w-4xl mx-auto shadow-sm">
+                    <div class="text-center border-b-4 border-double border-black pb-4 mb-8">
+                        <h1 class="text-xl font-black uppercase">RSU Dadi Keluarga Purwokerto</h1>
+                        <p class="text-[9px] font-bold">Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan</p>
+                    </div>
+                    <h2 class="text-center font-bold underline uppercase text-sm mb-6">LAPORAN MONITORING SARANA PRASARANA</h2>
+                    <table class="w-full report-table">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th style="width: 5%">No</th>
+                                <th style="width: 15%">Tgl</th>
+                                <th style="width: 15%">Unit</th>
+                                <th style="width: 30%">Temuan Kerusakan</th>
+                                <th style="width: 25%">Tindak Lanjut</th>
+                                <th style="width: 10%">Status</th>
+                            </tr>
+                        </thead>
                         <tbody id="rpt-body"></tbody>
                     </table>
+                    <div class="mt-12 flex justify-end">
+                        <div class="text-center">
+                            <p class="text-[10px] mb-12">Purwokerto, <span id="rpt-date-now"></span></p>
+                            <p class="text-[10px] font-bold underline">Petugas Rumah Tangga</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            <!-- RINGKASAN SKOR -->
             <div id="view-ringkasan" class="tab-content hidden">
-                <!-- Ringkasan Content -->
                 <div class="flex flex-wrap gap-2 mb-6 no-print justify-center bg-gray-50 p-4 rounded-xl">
                     <select id="rpt-month-sum" class="p-2 border rounded-xl text-xs font-bold">
                         <option value="01">Januari</option><option value="02">Februari</option><option value="03">Maret</option>
@@ -732,250 +259,300 @@
                         <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
                     </select>
                     <select id="rpt-year-sum" class="p-2 border rounded-xl text-xs font-bold"></select>
-                    <button onclick="generateReportSummary()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Hitung</button>
+                    <button onclick="generateReportSummary()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black">LIHAT</button>
                 </div>
-                <div class="report-page bg-white p-6 border overflow-x-auto">
-                    <table class="w-full text-[10px] border-collapse">
-                        <thead><tr class="bg-gray-100"><th class="border p-2">No</th><th class="border p-2">Unit</th><th class="border p-2">Total</th><th class="border p-2">Skor</th></tr></thead>
+                <div id="report-sum-print" class="report-page bg-white p-10 border max-w-4xl mx-auto">
+                    <div class="text-center border-b-4 border-double border-black pb-4 mb-8">
+                        <h1 class="text-xl font-black uppercase">RSU Dadi Keluarga</h1>
+                        <p class="text-[9px] font-bold">Ringkasan Kelayakan Sarpras Per Unit</p>
+                    </div>
+                    <table class="w-full report-table">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th>No</th><th>Unit</th><th>Total Temuan</th><th>Selesai</th><th>Proses</th><th>Skor Kelayakan</th>
+                            </tr>
+                        </thead>
                         <tbody id="rpt-summary-body"></tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- MASTER RUANGAN -->
+            <div id="view-ruangan" class="tab-content hidden">
+                <div class="max-w-md mx-auto bg-white p-8 rounded-2xl border">
+                    <h2 class="font-black mb-6 uppercase text-blue-900 border-b pb-2 tracking-widest">Manajemen Unit</h2>
+                    <div class="flex gap-2 mb-6">
+                        <input type="text" id="new-room-name" class="flex-1 p-3 border rounded-xl outline-none" placeholder="Nama Unit Baru...">
+                        <button onclick="addRoom()" class="bg-blue-900 text-white px-6 py-3 rounded-xl font-black">+</button>
+                    </div>
+                    <ul id="room-list" class="space-y-2"></ul>
                 </div>
             </div>
         </div>
     </main>
 
     <script>
-        let db, auth, MONITORING_PATH, SETTINGS_PATH;
+        // --- FIREBASE CONFIG ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBvZG0c46fj15eR48aHQlHfVGU_ZlmpSbg",
+            authDomain: "monitoring-sarpras.firebaseapp.com",
+            projectId: "monitoring-sarpras",
+            storageBucket: "monitoring-sarpras.firebasestorage.app",
+            messagingSenderId: "929738031503",
+            appId: "1:929738031503:web:74a394f4a7fa8dc6154bfa",
+            measurementId: "G-Q8C8CC5NGM"
+        };
+
+        const app = firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'monitoring-sarpras';
+        const MONITORING_COL = db.collection('artifacts', APP_ID, 'public', 'data', 'monitoring');
+        const SETTINGS_DOC = db.doc(`artifacts/${APP_ID}/settings/rooms_config`);
+
         let records = [];
         let rooms = [];
-        let isConnected = false;
 
-        async function initSystem() {
-            const status = document.getElementById('status-text');
-            const debug = document.getElementById('debug-text');
-            
+        window.onload = async () => {
             try {
-                debug.innerText = "Checking Config...";
-                const firebaseConfig = JSON.parse(__firebase_config);
-                const app = firebase.initializeApp(firebaseConfig);
-                db = firebase.firestore();
-                auth = firebase.auth();
+                await auth.signInAnonymously();
                 
-                const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-sarpras-id';
-                MONITORING_PATH = `artifacts/${appId}/public/data/monitoring`;
-                SETTINGS_PATH = `artifacts/${appId}/public/data/settings/rooms_config`;
-
-                debug.innerText = "Authenticating...";
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await auth.signInWithCustomToken(__initial_auth_token);
-                } else {
-                    await auth.signInAnonymously();
-                }
-
-                auth.onAuthStateChanged((user) => {
-                    if (user) {
-                        debug.innerText = "User Authenticated. Waiting for Data...";
-                        startListening();
+                // Sync Rooms
+                SETTINGS_DOC.onSnapshot(doc => {
+                    if (doc.exists) {
+                        rooms = doc.data().list || [];
+                    } else {
+                        rooms = ["IGD", "POLI", "ICU", "RANAP"];
+                        SETTINGS_DOC.set({ list: rooms });
                     }
-                });
+                    renderRoomOptions();
+                }, err => console.error("Room Sync Error:", err));
 
-                // Fail-safe Timer
-                setTimeout(() => {
-                    if (!isConnected) {
-                        document.getElementById('spinner').classList.add('hidden');
-                        document.getElementById('repair-box').classList.remove('hidden');
-                        status.innerText = "Koneksi Bermasalah";
-                        status.classList.add('text-red-600');
-                    }
-                }, 7000);
+                // Sync Data
+                MONITORING_COL.orderBy('tgl', 'desc').onSnapshot(snap => {
+                    records = snap.docs.map(doc => ({ id_cloud: doc.id, ...doc.data() }));
+                    updateDashboard();
+                    renderDatabase();
+                    document.getElementById('loader').style.display = 'none';
+                }, err => console.error("Data Sync Error:", err));
+
+                document.getElementById('in-tgl').valueAsDate = new Date();
+                populateYears();
+                switchTab('dashboard');
+                document.getElementById('rpt-date-now').innerText = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
 
             } catch (err) {
-                status.innerText = "Error Konfigurasi";
-                debug.innerText = err.message;
+                console.error(err);
+                document.getElementById('auth-error-box').classList.remove('hidden');
+                document.getElementById('auth-error-msg').innerText = "Koneksi Gagal: " + err.message;
             }
-        }
+        };
 
-        function startListening() {
-            // Room Config Sync
-            db.doc(SETTINGS_PATH).onSnapshot(doc => {
-                if (doc.exists) {
-                    rooms = doc.data().list || [];
-                } else {
-                    rooms = ["IGD", "POLI", "RANAP", "ICU", "OK", "LAB", "RAD", "GIZI"];
-                    db.doc(SETTINGS_PATH).set({ list: rooms });
-                }
-                renderRoomOptions();
-            }, err => console.log("Room error ignored"));
-
-            // Data Sync
-            db.collection(MONITORING_PATH).onSnapshot(snap => {
-                isConnected = true;
-                records = snap.docs.map(doc => ({ id_cloud: doc.id, ...doc.data() }));
-                records.sort((a, b) => new Date(b.tgl) - new Date(a.tgl));
-                
-                updateDashboard();
-                renderDatabase();
-                
-                document.getElementById('loader').style.opacity = '0';
-                setTimeout(() => document.getElementById('loader').style.display = 'none', 500);
-                document.getElementById('cloud-indicator').classList.remove('hidden');
-            }, err => {
-                document.getElementById('debug-text').innerText = "Permission Denied: Periksa Aturan Firestore.";
-            });
-        }
-
-        function forceOpen() {
-            document.getElementById('loader').style.display = 'none';
-        }
-
-        // --- CORE FUNCTIONS ---
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(v => v.classList.add('hidden'));
             document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
             document.getElementById(`view-${tabId}`).classList.remove('hidden');
             document.getElementById(`btn-${tabId}`).classList.add('tab-active');
-            if(tabId === 'history') renderHistory();
         }
 
-        function renderRoomOptions() {
-            const selects = ['in-room', 'hist-room-select'];
-            const opts = rooms.sort().map(r => `<option value="${r}">${r}</option>`).join('');
-            selects.forEach(id => {
-                const el = document.getElementById(id);
-                const cur = el.value;
-                el.innerHTML = (id.includes('hist') ? '<option value="">Pilih Unit</option>' : '') + opts;
-                if(cur) el.value = cur;
-            });
-
-            document.getElementById('room-list').innerHTML = rooms.sort().map(r => `
-                <li class="flex justify-between items-center p-4 bg-white border rounded-2xl font-bold uppercase text-xs shadow-sm">
-                    ${r}
-                    <button onclick="deleteRoom('${r}')" class="text-red-500 w-8 h-8 rounded-full hover:bg-red-50">✕</button>
-                </li>
-            `).join('');
-        }
-
-        async function addRoom() {
-            const val = document.getElementById('new-room-name').value.trim().toUpperCase();
-            if(!val || rooms.includes(val)) return;
-            const newList = [...rooms, val];
-            await db.doc(SETTINGS_PATH).set({ list: newList });
-            document.getElementById('new-room-name').value = '';
-        }
-
-        async function deleteRoom(name) {
-            if(!confirm(`Hapus unit ${name}?`)) return;
-            const newList = rooms.filter(r => r !== name);
-            await db.doc(SETTINGS_PATH).set({ list: newList });
-        }
-
+        // --- DATABASE OPERATIONS ---
         document.getElementById('form-entry').onsubmit = async function(e) {
             e.preventDefault();
             const data = {
                 tgl: document.getElementById('in-tgl').value,
                 ruangan: document.getElementById('in-room').value,
                 temuan: document.getElementById('in-temuan').value,
+                tindakan: document.getElementById('in-tindakan').value,
                 status: document.getElementById('in-status').value,
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             };
-            await db.collection(MONITORING_PATH).add(data);
-            this.reset();
-            document.getElementById('in-tgl').valueAsDate = new Date();
-            switchTab('dashboard');
+
+            try {
+                await MONITORING_COL.add(data);
+                this.reset();
+                document.getElementById('in-tgl').valueAsDate = new Date();
+                alert("Data Tersimpan!");
+            } catch (err) {
+                alert("Gagal: " + err.message);
+            }
         };
 
-        function updateDashboard() {
-            const total = records.length;
-            const selesai = records.filter(r => r.status === 'Selesai').length;
-            document.getElementById('dash-total').innerText = total;
-            document.getElementById('dash-selesai').innerText = selesai;
-            document.getElementById('dash-proses').innerText = total - selesai;
-            const score = total === 0 ? 100 : Math.round((selesai/total)*100);
-            const pb = document.getElementById('dash-progress');
-            pb.style.width = score + '%';
-            pb.innerText = score + '% KELAYAKAN';
+        async function submitUpdate() {
+            const id = document.getElementById('edit-id').value;
+            const updateData = {
+                tgl: document.getElementById('edit-tgl').value,
+                ruangan: document.getElementById('edit-room').value,
+                temuan: document.getElementById('edit-temuan').value,
+                tindakan: document.getElementById('edit-tindakan').value,
+                status: document.getElementById('edit-status').value
+            };
+
+            try {
+                await MONITORING_COL.doc(id).update(updateData);
+                closeModal();
+            } catch (err) {
+                alert("Gagal update data.");
+            }
+        }
+
+        async function deleteData(id) {
+            if (confirm("Hapus data ini?")) {
+                try {
+                    await MONITORING_COL.doc(id).delete();
+                } catch (err) {
+                    alert("Gagal menghapus data.");
+                }
+            }
+        }
+
+        // --- MASTER RUANGAN ---
+        async function addRoom() {
+            const val = document.getElementById('new-room-name').value.trim().toUpperCase();
+            if (!val) return;
+            if (!rooms.includes(val)) {
+                const newList = [...rooms, val];
+                await SETTINGS_DOC.set({ list: newList });
+                document.getElementById('new-room-name').value = '';
+            }
+        }
+
+        async function deleteRoom(name) {
+            if (!confirm(`Hapus unit ${name}?`)) return;
+            const newList = rooms.filter(r => r !== name);
+            await SETTINGS_DOC.set({ list: newList });
+        }
+
+        // --- RENDERERS ---
+        function renderRoomOptions() {
+            const selects = ['in-room', 'edit-room', 'hist-room-select'];
+            const sortedRooms = [...rooms].sort();
+            const options = sortedRooms.map(r => `<option value="${r}">${r}</option>`).join('');
+            
+            selects.forEach(id => {
+                const el = document.getElementById(id);
+                if (id === 'in-room' || id === 'hist-room-select') {
+                    el.innerHTML = '<option value="" disabled selected>-- Pilih Unit --</option>' + options;
+                } else {
+                    el.innerHTML = options;
+                }
+            });
+
+            document.getElementById('room-list').innerHTML = sortedRooms.map(r => `
+                <li class="flex justify-between items-center p-3 border rounded-xl text-xs font-bold uppercase">
+                    ${r}
+                    <button onclick="deleteRoom('${r}')" class="text-red-500 font-black">✕</button>
+                </li>
+            `).join('');
         }
 
         function renderDatabase() {
-            document.getElementById('db-list').innerHTML = records.map((r, i) => `
+            const body = document.getElementById('db-list');
+            body.innerHTML = records.map((r, idx) => `
                 <tr class="border-b hover:bg-gray-50 uppercase font-medium">
-                    <td class="p-5 text-gray-400">${i+1}</td>
-                    <td class="p-5">${r.tgl}</td>
-                    <td class="p-5 font-bold text-blue-900">${r.ruangan}</td>
-                    <td class="p-5">${r.temuan}</td>
-                    <td class="p-5">
-                        <span class="px-3 py-1 rounded-full text-[9px] font-black ${r.status === 'Selesai' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}">
+                    <td class="p-4 font-bold text-gray-400">${idx + 1}</td>
+                    <td class="p-4 whitespace-nowrap">${r.tgl}</td>
+                    <td class="p-4 font-extrabold text-blue-900">${r.ruangan}</td>
+                    <td class="p-4">${r.temuan}</td>
+                    <td class="p-4">
+                        <span class="px-2 py-1 rounded-full text-[9px] font-black ${r.status === 'Selesai' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
                             ${r.status}
                         </span>
                     </td>
-                    <td class="p-5 text-center no-print">
-                        <button onclick="deleteData('${r.id_cloud}')" class="text-red-500 font-bold hover:underline">Hapus</button>
+                    <td class="p-4 text-center no-print">
+                        <div class="flex gap-2 justify-center">
+                            <button onclick="openUpdateModal('${r.id_cloud}')" class="bg-blue-900 text-white px-3 py-1.5 rounded-lg font-black text-[9px]">EDIT</button>
+                            <button onclick="deleteData('${r.id_cloud}')" class="bg-red-500 text-white px-3 py-1.5 rounded-lg font-black text-[9px]">HAPUS</button>
+                        </div>
                     </td>
                 </tr>
             `).join('');
         }
 
-        async function deleteData(id) {
-            if(confirm("Hapus data?")) await db.collection(MONITORING_PATH).doc(id).delete();
-        }
-
         function renderHistory() {
             const room = document.getElementById('hist-room-select').value;
-            const container = document.getElementById('hist-container');
-            if(!room) { container.innerHTML = ''; return; }
-            const filtered = records.filter(r => r.ruangan === room);
-            container.innerHTML = filtered.map(r => `
-                <div class="bg-white p-6 rounded-2xl border-l-8 ${r.status === 'Selesai' ? 'border-green-500' : 'border-amber-500'} shadow-sm">
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="text-[10px] font-black text-gray-400 uppercase">${r.tgl}</span>
-                        <span class="text-[9px] font-black uppercase ${r.status === 'Selesai' ? 'text-green-600' : 'text-amber-600'}">${r.status}</span>
-                    </div>
-                    <p class="font-bold text-blue-900 uppercase text-sm">${r.temuan}</p>
-                </div>
+            const body = document.getElementById('hist-list');
+            body.innerHTML = records.filter(r => r.ruangan === room).map(r => `
+                <tr class="border-b uppercase">
+                    <td class="p-4 whitespace-nowrap">${r.tgl}</td>
+                    <td class="p-4 font-bold">${r.temuan}</td>
+                    <td class="p-4 italic">${r.tindakan || '-'}</td>
+                    <td class="p-4 font-black ${r.status === 'Selesai' ? 'text-emerald-600' : 'text-amber-500'}">${r.status}</td>
+                </tr>
             `).join('');
         }
 
-        function populateYears() {
-            const currentYear = new Date().getFullYear();
-            ['rpt-year', 'rpt-year-sum'].forEach(id => {
-                const s = document.getElementById(id);
-                for(let i = 2035; i >= 2022; i--) s.innerHTML += `<option value="${i}">${i}</option>`;
-                s.value = currentYear;
-            });
+        function updateDashboard() {
+            const total = records.length;
+            const selesai = records.filter(r => r.status === 'Selesai').length;
+            const progress = total === 0 ? 100 : Math.round((selesai / total) * 100);
+            document.getElementById('dash-total').innerText = total;
+            document.getElementById('dash-selesai').innerText = selesai;
+            document.getElementById('dash-proses').innerText = total - selesai;
+            document.getElementById('dash-progress').style.width = progress + '%';
+            document.getElementById('dash-progress').innerText = progress + '% KELAYAKAN';
         }
 
-        window.onload = () => {
-            initSystem();
-            document.getElementById('in-tgl').valueAsDate = new Date();
-            populateYears();
-            switchTab('dashboard');
-        };
-
-        function exportTableToExcel(tableID, filename = ''){
-            const table = document.getElementById(tableID);
-            const wb = XLSX.utils.table_to_book(table, {sheet: "Sheet1"});
-            XLSX.writeFile(wb, filename + '.xlsx');
-        }
-
-        // Dummy report functions to maintain file integrity
         function generateReport() {
-             const m = document.getElementById('rpt-month').value;
-             const y = document.getElementById('rpt-year').value;
-             const filtered = records.filter(r => r.tgl.startsWith(`${y}-${m}`));
-             document.getElementById('rpt-body').innerHTML = filtered.map((r, i) => `
-                <tr><td class="border p-2">${i+1}</td><td class="border p-2">${r.tgl}</td><td class="border p-2">${r.ruangan}</td><td class="border p-2">${r.temuan}</td><td class="border p-2">${r.status}</td></tr>
-             `).join('');
+            const m = document.getElementById('rpt-month').value;
+            const y = document.getElementById('rpt-year').value;
+            const filtered = records.filter(r => r.tgl.startsWith(`${y}-${m}`));
+            const body = document.getElementById('rpt-body');
+            body.innerHTML = filtered.length ? filtered.map((r, idx) => `
+                <tr>
+                    <td>${idx + 1}</td>
+                    <td>${r.tgl}</td>
+                    <td class="font-bold">${r.ruangan}</td>
+                    <td>${r.temuan}</td>
+                    <td>${r.tindakan || '-'}</td>
+                    <td class="font-black text-[8px]">${r.status}</td>
+                </tr>
+            `).join('') : '<tr><td colspan="6" class="text-center italic py-4">Tidak ada data untuk periode ini</td></tr>';
         }
+
         function generateReportSummary() {
             const m = document.getElementById('rpt-month-sum').value;
             const y = document.getElementById('rpt-year-sum').value;
-            document.getElementById('rpt-summary-body').innerHTML = rooms.map((room, i) => {
+            const body = document.getElementById('rpt-summary-body');
+            body.innerHTML = rooms.sort().map((room, idx) => {
                 const roomRecs = records.filter(r => r.ruangan === room && r.tgl.startsWith(`${y}-${m}`));
-                const score = roomRecs.length === 0 ? 100 : Math.round((roomRecs.filter(r=>r.status==='Selesai').length/roomRecs.length)*100);
-                return `<tr><td class="border p-2">${i+1}</td><td class="border p-2">${room}</td><td class="border p-2 text-center">${roomRecs.length}</td><td class="border p-2 text-center font-bold">${score}%</td></tr>`;
+                const total = roomRecs.length;
+                const done = roomRecs.filter(r => r.status === 'Selesai').length;
+                const proc = total - done;
+                const score = total === 0 ? 100 : Math.round((done/total)*100);
+                return `<tr><td>${idx+1}</td><td>${room}</td><td>${total}</td><td>${done}</td><td>${proc}</td><td class="font-black">${score}%</td></tr>`;
             }).join('');
+        }
+
+        function populateYears() {
+            const y = new Date().getFullYear();
+            const selects = ['rpt-year', 'rpt-year-sum'];
+            selects.forEach(id => {
+                const s = document.getElementById(id);
+                s.innerHTML = '';
+                for(let i=y; i>=y-2; i--) s.innerHTML += `<option value="${i}">${i}</option>`;
+            });
+        }
+
+        function openUpdateModal(id) {
+            const r = records.find(x => x.id_cloud === id);
+            if (!r) return;
+            document.getElementById('edit-id').value = id;
+            document.getElementById('edit-tgl').value = r.tgl;
+            document.getElementById('edit-room').value = r.ruangan;
+            document.getElementById('edit-temuan').value = r.temuan;
+            document.getElementById('edit-tindakan').value = r.tindakan || '';
+            document.getElementById('edit-status').value = r.status;
+            document.getElementById('modal-update').classList.add('active');
+        }
+
+        function closeModal() { document.getElementById('modal-update').classList.remove('active'); }
+
+        function exportTableToExcel(id, name) {
+            const table = document.getElementById(id);
+            const wb = XLSX.utils.table_to_book(table);
+            XLSX.writeFile(wb, `${name}.xlsx`);
         }
     </script>
 </body>
 </html>
-
