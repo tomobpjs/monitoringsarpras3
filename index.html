@@ -6,7 +6,7 @@
     <title>Monitoring Sarpras RSU Dadi Keluarga</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <!-- Firebase SDKs -->
+    <!-- Firebase SDKs (Compat untuk kemudahan integrasi single file) -->
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth-compat.js"></script>
@@ -23,6 +23,8 @@
         .report-table th, .report-table td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
         .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 50; align-items: center; justify-content: center; backdrop-filter: blur(2px); padding: 20px; }
         .modal.active { display: flex; }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -33,7 +35,7 @@
         <h2 class="text-blue-900 font-bold">Sinkronisasi Cloud...</h2>
         <div id="auth-error-box" class="hidden mt-6 p-4 max-w-sm bg-red-50 border border-red-200 rounded-lg text-center">
             <p class="text-red-600 text-sm font-bold" id="auth-error-msg"></p>
-            <p class="text-[10px] text-gray-500 mt-2">Pastikan domain terdaftar & Auth aktif.</p>
+            <p class="text-[10px] text-gray-500 mt-2">Pastikan koneksi internet stabil.</p>
         </div>
     </div>
 
@@ -82,13 +84,13 @@
     <header class="bg-white border-b-4 border-blue-900 p-6 shadow-sm no-print">
         <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
-                <h1 class="text-2xl font-black text-blue-900 tracking-tight uppercase">Portal Monitoring Sarpras RSU Dadi Keluarga Purwokerto</h1>
+                <h1 class="text-2xl font-black text-blue-900 tracking-tight uppercase">Portal Monitoring Sarpras RSU Dadi Keluarga</h1>
                 <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest">Aplikasi Gawean Dewek v1.0 By: TOMOSJR2026</p>
             </div>
             <div class="flex gap-2">
                 <div class="bg-blue-50 px-4 py-2 rounded-full border border-blue-100">
                     <p class="text-[10px] font-black text-blue-700 uppercase tracking-tighter flex items-center gap-2">
-                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Cloud Active
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span> Cloud Storage Active
                     </p>
                 </div>
             </div>
@@ -101,7 +103,7 @@
             <button onclick="switchTab('input')" id="btn-input" class="px-6 py-4 whitespace-nowrap transition-all border-r">Input Data</button>
             <button onclick="switchTab('database')" id="btn-database" class="px-6 py-4 whitespace-nowrap transition-all border-r">Database Cloud</button>
             <button onclick="switchTab('history')" id="btn-history" class="px-6 py-4 whitespace-nowrap transition-all border-r">Riwayat Unit</button>
-            <button onclick="switchTab('log')" id="btn-log" class="px-6 py-4 whitespace-nowrap text-blue-700 font-bold border-r bg-blue-50/20">Laporan Log Detail</button>
+            <button onclick="switchTab('log')" id="btn-log" class="px-6 py-4 whitespace-nowrap text-blue-700 font-bold border-r bg-blue-50/20">Laporan Detail</button>
             <button onclick="switchTab('ringkasan')" id="btn-ringkasan" class="px-6 py-4 whitespace-nowrap text-blue-700 font-bold border-r bg-blue-50/20">Ringkasan Skor</button>
             <button onclick="switchTab('ruangan')" id="btn-ruangan" class="px-6 py-4 whitespace-nowrap">Master Ruangan</button>
         </nav>
@@ -160,7 +162,7 @@
                             </select>
                         </div>
                     </div>
-                    <button type="submit" class="mt-8 bg-blue-900 text-white w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-blue-800">Simpan Data</button>
+                    <button type="submit" class="mt-8 bg-blue-900 text-white w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg hover:bg-blue-800">Simpan ke Cloud</button>
                 </form>
             </div>
 
@@ -218,10 +220,10 @@
                         <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
                     </select>
                     <select id="rpt-year" class="p-2 border rounded-xl text-xs font-bold"></select>
-                    <button onclick="generateReport()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black">LIHAT</button>
-                    <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-xl text-[10px] font-black">CETAK PDF</button>
+                    <button onclick="generateReport()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Lihat Data</button>
+                    <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Cetak PDF</button>
                 </div>
-                <div id="report-print" class="report-page bg-white p-10 border max-w-4xl mx-auto shadow-sm">
+                <div id="report-print" class="report-page bg-white p-10 border max-w-5xl mx-auto shadow-sm">
                     <div class="text-center border-b-4 border-double border-black pb-4 mb-8">
                         <h1 class="text-xl font-black uppercase">RSU Dadi Keluarga Purwokerto</h1>
                         <p class="text-[9px] font-bold">Jl. Sultan Agung No. 8A, Teluk, Purwokerto Selatan</p>
@@ -231,8 +233,9 @@
                         <thead class="bg-gray-50">
                             <tr>
                                 <th style="width: 5%">No</th>
-                                <th style="width: 15%">Tgl</th>
-                                <th style="width: 15%">Unit</th>
+                                <th style="width: 10%">Tgl</th>
+                                <th style="width: 8%">Tahun</th>
+                                <th style="width: 12%">Unit</th>
                                 <th style="width: 30%">Temuan Kerusakan</th>
                                 <th style="width: 25%">Tindak Lanjut</th>
                                 <th style="width: 10%">Status</th>
@@ -243,7 +246,7 @@
                     <div class="mt-12 flex justify-end">
                         <div class="text-center">
                             <p class="text-[10px] mb-12">Purwokerto, <span id="rpt-date-now"></span></p>
-                            <p class="text-[10px] font-bold underline">Petugas Rumah Tangga</p>
+                            <p class="text-[10px] font-bold underline">Petugas Sarpras / RT</p>
                         </div>
                     </div>
                 </div>
@@ -259,9 +262,10 @@
                         <option value="10">Oktober</option><option value="11">November</option><option value="12">Desember</option>
                     </select>
                     <select id="rpt-year-sum" class="p-2 border rounded-xl text-xs font-bold"></select>
-                    <button onclick="generateReportSummary()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black">LIHAT</button>
+                    <button onclick="generateReportSummary()" class="bg-blue-900 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Lihat Skor</button>
+                    <button onclick="window.print()" class="bg-gray-800 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase">Cetak PDF</button>
                 </div>
-                <div id="report-sum-print" class="report-page bg-white p-10 border max-w-4xl mx-auto">
+                <div id="report-sum-print" class="report-page bg-white p-10 border max-w-5xl mx-auto">
                     <div class="text-center border-b-4 border-double border-black pb-4 mb-8">
                         <h1 class="text-xl font-black uppercase">RSU Dadi Keluarga</h1>
                         <p class="text-[9px] font-bold">Ringkasan Kelayakan Sarpras Per Unit</p>
@@ -269,7 +273,13 @@
                     <table class="w-full report-table">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th>No</th><th>Unit</th><th>Total Temuan</th><th>Selesai</th><th>Proses</th><th>Skor Kelayakan</th>
+                                <th>No</th>
+                                <th>Tahun</th>
+                                <th>Unit</th>
+                                <th>Total Temuan</th>
+                                <th>Selesai</th>
+                                <th>Proses</th>
+                                <th>Skor Kelayakan</th>
                             </tr>
                         </thead>
                         <tbody id="rpt-summary-body"></tbody>
@@ -293,49 +303,36 @@
 
     <script>
         // --- FIREBASE CONFIG ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyBvZG0c46fj15eR48aHQlHfVGU_ZlmpSbg",
-            authDomain: "monitoring-sarpras.firebaseapp.com",
-            projectId: "monitoring-sarpras",
-            storageBucket: "monitoring-sarpras.firebasestorage.app",
-            messagingSenderId: "929738031503",
-            appId: "1:929738031503:web:74a394f4a7fa8dc6154bfa",
-            measurementId: "G-Q8C8CC5NGM"
-        };
-
+        const firebaseConfig = JSON.parse(__firebase_config);
         const app = firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
 
-        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'monitoring-sarpras';
-        const MONITORING_COL = db.collection('artifacts', APP_ID, 'public', 'data', 'monitoring');
-        const SETTINGS_DOC = db.doc(`artifacts/${APP_ID}/settings/rooms_config`);
+        const APP_ID = typeof __app_id !== 'undefined' ? __app_id : 'monitoring-sarpras-rsu';
+        
+        const MONITORING_PATH = `artifacts/${APP_ID}/public/data/monitoring`;
+        const SETTINGS_PATH = `artifacts/${APP_ID}/public/data/settings/rooms_config`;
 
         let records = [];
         let rooms = [];
+        let authReady = false;
 
         window.onload = async () => {
             try {
-                await auth.signInAnonymously();
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await auth.signInWithCustomToken(__initial_auth_token);
+                } else {
+                    await auth.signInAnonymously();
+                }
                 
-                // Sync Rooms
-                SETTINGS_DOC.onSnapshot(doc => {
-                    if (doc.exists) {
-                        rooms = doc.data().list || [];
+                auth.onAuthStateChanged((user) => {
+                    if (user) {
+                        authReady = true;
+                        startDataSync();
                     } else {
-                        rooms = ["IGD", "POLI", "ICU", "RANAP"];
-                        SETTINGS_DOC.set({ list: rooms });
+                        console.error("Auth failed or user signed out.");
                     }
-                    renderRoomOptions();
-                }, err => console.error("Room Sync Error:", err));
-
-                // Sync Data
-                MONITORING_COL.orderBy('tgl', 'desc').onSnapshot(snap => {
-                    records = snap.docs.map(doc => ({ id_cloud: doc.id, ...doc.data() }));
-                    updateDashboard();
-                    renderDatabase();
-                    document.getElementById('loader').style.display = 'none';
-                }, err => console.error("Data Sync Error:", err));
+                });
 
                 document.getElementById('in-tgl').valueAsDate = new Date();
                 populateYears();
@@ -343,22 +340,60 @@
                 document.getElementById('rpt-date-now').innerText = new Date().toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'});
 
             } catch (err) {
-                console.error(err);
-                document.getElementById('auth-error-box').classList.remove('hidden');
-                document.getElementById('auth-error-msg').innerText = "Koneksi Gagal: " + err.message;
+                console.error("Initialization Error:", err);
+                showAuthError("Koneksi Gagal: " + err.message);
             }
         };
+
+        function startDataSync() {
+            if (!authReady) return;
+
+            db.doc(SETTINGS_PATH).onSnapshot(doc => {
+                if (doc.exists) {
+                    rooms = doc.data().list || [];
+                } else {
+                    rooms = ["IGD", "POLIKLINIK", "ICU", "HCU", "RADIOLOGI", "FARMASI", "LABORATORIUM", "IPSRS", "KAMAR BERSALIN", "OK (BEDAH)", "RANAP LANTAI 2", "RANAP LANTAI 3"];
+                    db.doc(SETTINGS_PATH).set({ list: rooms }).catch(e => console.error("Error setting default rooms:", e));
+                }
+                renderRoomOptions();
+            }, err => console.error("Room Sync Error:", err));
+
+            db.collection(MONITORING_PATH).onSnapshot(snap => {
+                records = snap.docs.map(doc => ({ id_cloud: doc.id, ...doc.data() }));
+                records.sort((a, b) => new Date(b.tgl) - new Date(a.tgl));
+                
+                updateDashboard();
+                renderDatabase();
+                document.getElementById('loader').style.display = 'none';
+            }, err => {
+                console.error("Data Sync Error:", err);
+                showAuthError("Gagal mengambil data dari Cloud. Periksa izin akses.");
+            });
+        }
+
+        function showAuthError(msg) {
+            document.getElementById('loader').classList.remove('flex');
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('auth-error-box').classList.remove('hidden');
+            document.getElementById('auth-error-msg').innerText = msg;
+        }
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(v => v.classList.add('hidden'));
             document.querySelectorAll('nav button').forEach(b => b.classList.remove('tab-active'));
-            document.getElementById(`view-${tabId}`).classList.remove('hidden');
-            document.getElementById(`btn-${tabId}`).classList.add('tab-active');
+            const targetView = document.getElementById(`view-${tabId}`);
+            const targetBtn = document.getElementById(`btn-${tabId}`);
+            if(targetView) targetView.classList.remove('hidden');
+            if(targetBtn) targetBtn.classList.add('tab-active');
+            
+            if(tabId === 'history') renderHistory();
         }
 
         // --- DATABASE OPERATIONS ---
         document.getElementById('form-entry').onsubmit = async function(e) {
             e.preventDefault();
+            if (!authReady) return;
+
             const data = {
                 tgl: document.getElementById('in-tgl').value,
                 ruangan: document.getElementById('in-room').value,
@@ -369,16 +404,18 @@
             };
 
             try {
-                await MONITORING_COL.add(data);
+                await db.collection(MONITORING_PATH).add(data);
                 this.reset();
                 document.getElementById('in-tgl').valueAsDate = new Date();
-                alert("Data Tersimpan!");
+                showToast("Data Tersimpan di Cloud!");
             } catch (err) {
-                alert("Gagal: " + err.message);
+                console.error("Add Error:", err);
+                alert("Gagal menyimpan data: " + err.message);
             }
         };
 
         async function submitUpdate() {
+            if (!authReady) return;
             const id = document.getElementById('edit-id').value;
             const updateData = {
                 tgl: document.getElementById('edit-tgl').value,
@@ -389,18 +426,23 @@
             };
 
             try {
-                await MONITORING_COL.doc(id).update(updateData);
+                await db.collection(MONITORING_PATH).doc(id).update(updateData);
                 closeModal();
+                showToast("Perubahan Berhasil Disimpan!");
             } catch (err) {
+                console.error("Update Error:", err);
                 alert("Gagal update data.");
             }
         }
 
         async function deleteData(id) {
-            if (confirm("Hapus data ini?")) {
+            if (!authReady) return;
+            if (confirm("Hapus data temuan ini secara permanen dari Cloud?")) {
                 try {
-                    await MONITORING_COL.doc(id).delete();
+                    await db.collection(MONITORING_PATH).doc(id).delete();
+                    showToast("Data Dihapus.");
                 } catch (err) {
+                    console.error("Delete Error:", err);
                     alert("Gagal menghapus data.");
                 }
             }
@@ -408,19 +450,31 @@
 
         // --- MASTER RUANGAN ---
         async function addRoom() {
+            if (!authReady) return;
             const val = document.getElementById('new-room-name').value.trim().toUpperCase();
             if (!val) return;
             if (!rooms.includes(val)) {
                 const newList = [...rooms, val];
-                await SETTINGS_DOC.set({ list: newList });
-                document.getElementById('new-room-name').value = '';
+                try {
+                    await db.doc(SETTINGS_PATH).set({ list: newList });
+                    document.getElementById('new-room-name').value = '';
+                    showToast("Unit Ditambahkan");
+                } catch(e) {
+                    alert("Gagal menambah unit.");
+                }
             }
         }
 
         async function deleteRoom(name) {
-            if (!confirm(`Hapus unit ${name}?`)) return;
+            if (!authReady) return;
+            if (!confirm(`Hapus unit ${name} dari daftar master?`)) return;
             const newList = rooms.filter(r => r !== name);
-            await SETTINGS_DOC.set({ list: newList });
+            try {
+                await db.doc(SETTINGS_PATH).set({ list: newList });
+                showToast("Unit Dihapus");
+            } catch(e) {
+                alert("Gagal menghapus unit.");
+            }
         }
 
         // --- RENDERERS ---
@@ -431,23 +485,27 @@
             
             selects.forEach(id => {
                 const el = document.getElementById(id);
+                if (!el) return;
+                const currentVal = el.value;
                 if (id === 'in-room' || id === 'hist-room-select') {
                     el.innerHTML = '<option value="" disabled selected>-- Pilih Unit --</option>' + options;
                 } else {
                     el.innerHTML = options;
                 }
+                if(currentVal) el.value = currentVal;
             });
 
             document.getElementById('room-list').innerHTML = sortedRooms.map(r => `
-                <li class="flex justify-between items-center p-3 border rounded-xl text-xs font-bold uppercase">
+                <li class="flex justify-between items-center p-3 border rounded-xl text-xs font-bold uppercase hover:bg-gray-50">
                     ${r}
-                    <button onclick="deleteRoom('${r}')" class="text-red-500 font-black">✕</button>
+                    <button onclick="deleteRoom('${r}')" class="text-red-500 font-black hover:bg-red-50 p-1 rounded-md">✕</button>
                 </li>
             `).join('');
         }
 
         function renderDatabase() {
             const body = document.getElementById('db-list');
+            if(!body) return;
             body.innerHTML = records.map((r, idx) => `
                 <tr class="border-b hover:bg-gray-50 uppercase font-medium">
                     <td class="p-4 font-bold text-gray-400">${idx + 1}</td>
@@ -472,25 +530,44 @@
         function renderHistory() {
             const room = document.getElementById('hist-room-select').value;
             const body = document.getElementById('hist-list');
-            body.innerHTML = records.filter(r => r.ruangan === room).map(r => `
+            if(!body) return;
+            if (!room) {
+                body.innerHTML = '<tr><td colspan="4" class="p-10 text-center italic text-gray-400">Pilih unit untuk melihat riwayat.</td></tr>';
+                return;
+            }
+            const filtered = records.filter(r => r.ruangan === room);
+            body.innerHTML = filtered.length ? filtered.map(r => `
                 <tr class="border-b uppercase">
                     <td class="p-4 whitespace-nowrap">${r.tgl}</td>
                     <td class="p-4 font-bold">${r.temuan}</td>
                     <td class="p-4 italic">${r.tindakan || '-'}</td>
                     <td class="p-4 font-black ${r.status === 'Selesai' ? 'text-emerald-600' : 'text-amber-500'}">${r.status}</td>
                 </tr>
-            `).join('');
+            `).join('') : '<tr><td colspan="4" class="p-10 text-center italic text-gray-400">Belum ada riwayat temuan untuk unit ini.</td></tr>';
         }
 
         function updateDashboard() {
             const total = records.length;
             const selesai = records.filter(r => r.status === 'Selesai').length;
             const progress = total === 0 ? 100 : Math.round((selesai / total) * 100);
-            document.getElementById('dash-total').innerText = total;
-            document.getElementById('dash-selesai').innerText = selesai;
-            document.getElementById('dash-proses').innerText = total - selesai;
-            document.getElementById('dash-progress').style.width = progress + '%';
-            document.getElementById('dash-progress').innerText = progress + '% KELAYAKAN';
+            
+            const dashTotal = document.getElementById('dash-total');
+            const dashSelesai = document.getElementById('dash-selesai');
+            const dashProses = document.getElementById('dash-proses');
+            
+            if(dashTotal) dashTotal.innerText = total;
+            if(dashSelesai) dashSelesai.innerText = selesai;
+            if(dashProses) dashProses.innerText = total - selesai;
+            
+            const pBar = document.getElementById('dash-progress');
+            if(pBar) {
+                pBar.style.width = progress + '%';
+                pBar.innerText = progress + '% KELAYAKAN';
+                
+                if(progress < 50) pBar.className = "bg-red-600 h-full rounded-full transition-all duration-1000 flex items-center justify-center text-white font-black text-sm";
+                else if(progress < 80) pBar.className = "bg-amber-500 h-full rounded-full transition-all duration-1000 flex items-center justify-center text-white font-black text-sm";
+                else pBar.className = "bg-blue-700 h-full rounded-full transition-all duration-1000 flex items-center justify-center text-white font-black text-sm";
+            }
         }
 
         function generateReport() {
@@ -498,39 +575,59 @@
             const y = document.getElementById('rpt-year').value;
             const filtered = records.filter(r => r.tgl.startsWith(`${y}-${m}`));
             const body = document.getElementById('rpt-body');
+            if(!body) return;
             body.innerHTML = filtered.length ? filtered.map((r, idx) => `
                 <tr>
                     <td>${idx + 1}</td>
-                    <td>${r.tgl}</td>
+                    <td>${r.tgl.split('-').reverse().join('/')}</td>
+                    <td class="text-center">${y}</td>
                     <td class="font-bold">${r.ruangan}</td>
                     <td>${r.temuan}</td>
                     <td>${r.tindakan || '-'}</td>
                     <td class="font-black text-[8px]">${r.status}</td>
                 </tr>
-            `).join('') : '<tr><td colspan="6" class="text-center italic py-4">Tidak ada data untuk periode ini</td></tr>';
+            `).join('') : '<tr><td colspan="7" class="text-center italic py-4">Tidak ada data untuk periode ini</td></tr>';
         }
 
         function generateReportSummary() {
             const m = document.getElementById('rpt-month-sum').value;
             const y = document.getElementById('rpt-year-sum').value;
             const body = document.getElementById('rpt-summary-body');
+            if(!body) return;
             body.innerHTML = rooms.sort().map((room, idx) => {
                 const roomRecs = records.filter(r => r.ruangan === room && r.tgl.startsWith(`${y}-${m}`));
                 const total = roomRecs.length;
                 const done = roomRecs.filter(r => r.status === 'Selesai').length;
                 const proc = total - done;
                 const score = total === 0 ? 100 : Math.round((done/total)*100);
-                return `<tr><td>${idx+1}</td><td>${room}</td><td>${total}</td><td>${done}</td><td>${proc}</td><td class="font-black">${score}%</td></tr>`;
+                return `<tr>
+                    <td>${idx+1}</td>
+                    <td class="text-center">${y}</td>
+                    <td class="font-bold">${room}</td>
+                    <td class="text-center">${total}</td>
+                    <td class="text-center">${done}</td>
+                    <td class="text-center">${proc}</td>
+                    <td class="font-black text-center">${score}%</td>
+                </tr>`;
             }).join('');
         }
 
         function populateYears() {
-            const y = new Date().getFullYear();
+            const currentYear = new Date().getFullYear();
+            const startYear = currentYear - 2;
+            const endYear = 2035; // Batas tahun diperpanjang sesuai permintaan
             const selects = ['rpt-year', 'rpt-year-sum'];
+            
             selects.forEach(id => {
                 const s = document.getElementById(id);
+                if(!s) return;
                 s.innerHTML = '';
-                for(let i=y; i>=y-2; i--) s.innerHTML += `<option value="${i}">${i}</option>`;
+                // Loop dari tahun sekarang hingga 2035, ditambah beberapa tahun sebelumnya untuk history
+                for(let i = endYear; i >= startYear; i--) {
+                    s.innerHTML += `<option value="${i}">${i}</option>`;
+                }
+                // Set default ke tahun sekarang agar user tidak bingung
+                s.value = currentYear;
             });
         }
 
@@ -546,14 +643,23 @@
             document.getElementById('modal-update').classList.add('active');
         }
 
-        function closeModal() { document.getElementById('modal-update').classList.remove('active'); }
+        function closeModal() {
+            document.getElementById('modal-update').classList.remove('active');
+        }
 
-        function exportTableToExcel(id, name) {
-            const table = document.getElementById(id);
-            const wb = XLSX.utils.table_to_book(table);
-            XLSX.writeFile(wb, `${name}.xlsx`);
+        function exportTableToExcel(tableID, filename = ''){
+            const table = document.getElementById(tableID);
+            const wb = XLSX.utils.table_to_book(table, {sheet: "Data Monitoring"});
+            XLSX.writeFile(wb, filename ? filename + '.xlsx' : 'Monitoring_Sarpras.xlsx');
+        }
+
+        function showToast(msg) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-blue-900 text-white px-6 py-3 rounded-full shadow-2xl z-[200] text-sm font-bold animate-bounce';
+            toast.innerText = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
         }
     </script>
 </body>
 </html>
-
