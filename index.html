@@ -73,6 +73,13 @@
                     <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Temuan Kerusakan</label>
                     <textarea id="edit-temuan" class="w-full p-2 border rounded-xl text-sm h-20 outline-none"></textarea>
                 </div>
+                
+                <!-- Ditambahkan: Preview Foto di Modal Edit -->
+                <div class="md:col-span-2 hidden" id="edit-foto-container">
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Foto Temuan</label>
+                    <img id="edit-foto-preview" src="" alt="Foto Temuan" class="w-full max-w-[200px] rounded-xl border object-cover">
+                </div>
+
                 <div class="md:col-span-2 border-t pt-4">
                     <label class="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">Tindak Lanjut</label>
                     <textarea id="edit-tindakan" class="w-full p-3 border rounded-xl text-sm h-24 bg-blue-50 outline-none"></textarea>
@@ -89,6 +96,13 @@
                 <button onclick="closeModal()" class="flex-1 px-4 py-3 text-sm font-bold text-gray-500">Batal</button>
                 <button onclick="submitUpdate()" class="flex-1 bg-blue-800 text-white px-4 py-3 rounded-xl font-bold text-sm shadow-lg">Simpan</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal Lihat Foto Full -->
+    <div id="modal-photo" class="modal no-print" onclick="this.classList.remove('active')">
+        <div class="relative max-w-3xl mx-auto p-4 flex justify-center items-center h-full pointer-events-none">
+            <img id="full-photo-view" src="" class="max-h-[80vh] max-w-full rounded-2xl shadow-2xl pointer-events-auto border-4 border-white">
         </div>
     </div>
 
@@ -178,7 +192,7 @@
                     </div>
                 </div>
 
-                <!-- ADDED: DASHBOARD PERSENTASE BULANAN -->
+                <!-- DASHBOARD PERSENTASE BULANAN -->
                 <div class="mt-12 mb-8">
                     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100">
                         <div>
@@ -268,6 +282,21 @@
                             <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Temuan Kerusakan</label>
                             <textarea id="in-temuan" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500 h-24" placeholder="Jelaskan detail kerusakan" required></textarea>
                         </div>
+                        
+                        <!-- Ditambahkan: Input Foto dengan capture camera -->
+                        <div class="flex flex-col md:col-span-2 bg-slate-50 p-4 rounded-xl border border-slate-200 border-dashed">
+                            <label class="text-[10px] font-black text-gray-500 mb-2 uppercase">Ambil Foto Temuan (Otomatis Kompres)</label>
+                            <input type="file" id="in-foto" accept="image/*" capture="environment" class="text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 outline-none cursor-pointer">
+                            <p class="text-[9px] text-gray-400 mt-1 font-medium">Buka dari HP akan otomatis mengaktifkan kamera belakang.</p>
+                            
+                            <!-- Area Preview Foto -->
+                            <div id="preview-container" class="hidden mt-4">
+                                <p class="text-[10px] font-black text-emerald-600 mb-1">Preview Foto (Telah Dikompres):</p>
+                                <img id="in-foto-preview" src="" alt="Preview" class="w-full max-w-[200px] rounded-xl border shadow-sm">
+                                <button type="button" onclick="removePhoto()" class="mt-2 text-[10px] font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg border border-red-100">Hapus Foto</button>
+                            </div>
+                        </div>
+
                         <div class="flex flex-col">
                             <label class="text-[10px] font-black text-gray-400 mb-1 uppercase">Rencana Tindakan</label>
                             <input type="text" id="in-tindakan" class="p-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500" placeholder="Langkah perbaikan awal">
@@ -280,7 +309,7 @@
                             </select>
                         </div>
                     </div>
-                    <button type="submit" class="mt-8 bg-blue-900 text-white w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg">Simpan Data</button>
+                    <button type="submit" class="mt-8 bg-blue-900 text-white w-full py-4 rounded-xl font-black text-sm uppercase tracking-widest shadow-lg transition hover:bg-blue-800">Simpan Data</button>
                 </form>
             </div>
 
@@ -294,7 +323,13 @@
                     <table id="db-table" class="w-full text-[11px] text-left border-collapse">
                         <thead class="bg-blue-900 text-white uppercase tracking-wider">
                             <tr>
-                                <th class="p-4">No</th><th class="p-4">Tanggal</th><th class="p-4">Unit</th><th class="p-4">Temuan</th><th class="p-4">Status</th><th class="p-4 text-center no-print">Aksi</th>
+                                <th class="p-4">No</th>
+                                <th class="p-4">Tanggal</th>
+                                <th class="p-4">Unit</th>
+                                <th class="p-4">Temuan</th>
+                                <th class="p-4 text-center">Foto</th> <!-- Ditambahkan -->
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-center no-print">Aksi</th>
                             </tr>
                         </thead>
                         <tbody id="db-list"></tbody>
@@ -439,6 +474,7 @@
 
         let records = [];
         let rooms = [];
+        let compressedPhotoBase64 = null; // Variable untuk menampung string foto
 
         window.onload = async () => {
             try {
@@ -452,15 +488,14 @@
                 MONITORING_COL.orderBy('tgl', 'desc').onSnapshot(snap => {
                     records = snap.docs.map(doc => ({ id_cloud: doc.id, ...doc.data() }));
                     populateDashboardYearFilter();
-                    updateDashboard(); // Init dashboard tahunan
-                    updateDashboardMonthly(); // Init dashboard bulanan
+                    updateDashboard(); 
+                    updateDashboardMonthly(); 
                     renderDatabase();
                     document.getElementById('loader').style.display = 'none';
                 });
 
                 document.getElementById('in-tgl').valueAsDate = new Date();
                 
-                // Set default month/year for monthly dashboard filters
                 const now = new Date();
                 document.getElementById('dash-month-filter').value = String(now.getMonth() + 1).padStart(2, '0');
                 
@@ -481,6 +516,63 @@
             document.getElementById(`btn-${tabId}`).classList.add('tab-active');
         }
 
+        // --- Logika Kompresi Foto HTML5 Canvas ---
+        document.getElementById('in-foto').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800; // Resolusi max agar hemat ukuran
+                    const MAX_HEIGHT = 800;
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Mengatur rasio aspek
+                    if (width > height) {
+                        if (width > MAX_WIDTH) {
+                            height *= MAX_WIDTH / width;
+                            width = MAX_WIDTH;
+                        }
+                    } else {
+                        if (height > MAX_HEIGHT) {
+                            width *= MAX_HEIGHT / height;
+                            height = MAX_HEIGHT;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Kompres ke JPEG dengan kualitas 60%
+                    compressedPhotoBase64 = canvas.toDataURL('image/jpeg', 0.6);
+
+                    // Tampilkan di UI
+                    document.getElementById('in-foto-preview').src = compressedPhotoBase64;
+                    document.getElementById('preview-container').classList.remove('hidden');
+                }
+                img.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+        });
+
+        function removePhoto() {
+            compressedPhotoBase64 = null;
+            document.getElementById('in-foto').value = '';
+            document.getElementById('preview-container').classList.add('hidden');
+            document.getElementById('in-foto-preview').src = '';
+        }
+
+        function viewFullPhoto(src) {
+            document.getElementById('full-photo-view').src = src;
+            document.getElementById('modal-photo').classList.add('active');
+        }
+
         function populateDashboardYearFilter() {
             const select = document.getElementById('dash-year-filter');
             const monthYearSelect = document.getElementById('dash-month-year-filter');
@@ -496,7 +588,6 @@
             select.innerHTML = optionsHtml;
             select.value = prev || currentYear;
 
-            // Monthly dashboard year filter
             monthYearSelect.innerHTML = optionsHtml;
             monthYearSelect.value = currentYear;
         }
@@ -524,7 +615,6 @@
             document.getElementById('dash-progress-text').innerText = pct + '% KELAYAKAN TAHUNAN';
         }
 
-        // --- NEW: LOGIC FOR MONTHLY DASHBOARD ---
         function updateDashboardMonthly() {
             const m = document.getElementById('dash-month-filter').value;
             const y = document.getElementById('dash-month-year-filter').value;
@@ -579,18 +669,34 @@
             `).join('') : '<tr><td colspan="6" class="text-center py-10 text-slate-400 italic font-medium">Data Monitoring Kosong Untuk Periode Ini</td></tr>';
         }
 
-        // --- Standard Logic & Operations ---
         document.getElementById('form-entry').onsubmit = async function(e) {
             e.preventDefault();
+            
+            const btn = this.querySelector('button[type="submit"]');
+            btn.innerHTML = 'Menyimpan...';
+            btn.disabled = true;
+
             const data = {
                 tgl: document.getElementById('in-tgl').value,
                 ruangan: document.getElementById('in-room').value,
                 temuan: document.getElementById('in-temuan').value,
                 tindakan: document.getElementById('in-tindakan').value,
                 status: document.getElementById('in-status').value,
+                foto: compressedPhotoBase64, // Memasukkan base64 gambar ke database
                 timestamp: firebase.firestore.FieldValue.serverTimestamp()
             };
-            try { await MONITORING_COL.add(data); this.reset(); alert("Data Cloud Berhasil Disimpan!"); } catch(e) { alert("Gagal Simpan"); }
+
+            try { 
+                await MONITORING_COL.add(data); 
+                this.reset(); 
+                removePhoto(); // Bersihkan foto setelah tersimpan
+                alert("Data Cloud Berhasil Disimpan!"); 
+            } catch(e) { 
+                alert("Gagal Simpan: " + e.message); 
+            } finally {
+                btn.innerHTML = 'Simpan Data';
+                btn.disabled = false;
+            }
         };
 
         async function submitUpdate() {
@@ -635,8 +741,14 @@
                     <td class="p-4 whitespace-nowrap">${r.tgl}</td>
                     <td class="p-4 font-black text-blue-900">${r.ruangan}</td>
                     <td class="p-4">${r.temuan}</td>
+                    <!-- Kolom Foto Baru -->
+                    <td class="p-4 text-center">
+                        ${r.foto 
+                            ? `<img src="${r.foto}" onclick="viewFullPhoto('${r.foto}')" class="w-10 h-10 object-cover rounded cursor-pointer border-2 hover:opacity-80 transition" title="Klik untuk perbesar">` 
+                            : `<span class="text-[9px] text-gray-300">Kosong</span>`}
+                    </td>
                     <td class="p-4"><span class="px-2 py-1 rounded-full text-[9px] font-black ${r.status === 'Selesai' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${r.status}</span></td>
-                    <td class="p-4 text-center no-print"><button onclick="openUpdateModal('${r.id_cloud}')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[9px] font-black">EDIT</button></td>
+                    <td class="p-4 text-center no-print"><button onclick="openUpdateModal('${r.id_cloud}')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[9px] font-black hover:bg-slate-800">EDIT</button></td>
                 </tr>`).join('');
         }
 
@@ -660,6 +772,16 @@
             if(!r) return;
             document.getElementById('edit-id').value = id;
             ['tgl','room','temuan','tindakan','status'].forEach(f => document.getElementById(`edit-${f}`).value = r[f === 'room' ? 'ruangan' : f] || '');
+            
+            // Menampilkan foto di modal edit jika ada
+            const fotoContainer = document.getElementById('edit-foto-container');
+            if(r.foto) {
+                document.getElementById('edit-foto-preview').src = r.foto;
+                fotoContainer.classList.remove('hidden');
+            } else {
+                fotoContainer.classList.add('hidden');
+            }
+
             document.getElementById('modal-update').classList.add('active');
         }
 
