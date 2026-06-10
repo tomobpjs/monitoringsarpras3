@@ -748,7 +748,12 @@
                             : `<span class="text-[9px] text-gray-300">Kosong</span>`}
                     </td>
                     <td class="p-4"><span class="px-2 py-1 rounded-full text-[9px] font-black ${r.status === 'Selesai' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">${r.status}</span></td>
-                    <td class="p-4 text-center no-print"><button onclick="openUpdateModal('${r.id_cloud}')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[9px] font-black hover:bg-slate-800">EDIT</button></td>
+                    <td class="p-4 text-center no-print">
+                        <div class="flex justify-center gap-1">
+                            <button onclick="openUpdateModal('${r.id_cloud}')" class="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-[9px] font-black hover:bg-slate-800">EDIT</button>
+                            <button onclick="deleteData('${r.id_cloud}')" class="bg-red-600 text-white px-3 py-1.5 rounded-lg text-[9px] font-black hover:bg-red-700">HAPUS</button>
+                        </div>
+                    </td>
                 </tr>`).join('');
         }
 
